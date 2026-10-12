@@ -101,10 +101,20 @@ export class ClientsService {
     return this.clientRepository.save(client);
   }
 
+  async saveClient(client: Client): Promise<Client> {
+    return this.clientRepository.save(client);
+  }
+
+  async updateMetadata(telegramId: number | string, metadata: Record<string, any>): Promise<Client | null> {
+    const client = await this.findByTelegramId(telegramId);
+    if (!client) return null;
+    client.metadata = { ...(client.metadata ?? {}), ...metadata };
+    return this.clientRepository.save(client);
+  }
+
   async cancelRegistration(telegramId: number | string): Promise<Client | null> {
     const client = await this.findByTelegramId(telegramId);
     if (!client) return null;
-
     client.registrationStep = null;
     return this.clientRepository.save(client);
   }

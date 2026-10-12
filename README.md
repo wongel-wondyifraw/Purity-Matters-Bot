@@ -111,9 +111,39 @@ For a complete step-by-step guide on deploying to cPanel using **Setup Node.js A
 
 | Command / Action | Description |
 |---|---|
-| `/start` | Welcomes user, records their profile to PostgreSQL, and presents interactive menu |
-| `/status` | Displays user's membership and registration status |
-| `/register` | Initiates member registration flow |
+| `/start` | Welcomes user and displays main navigation menu |
+| `/register` | 2-step registration: prompts full name, then requests verified phone number |
+| `/services` | Opens interactive Services Menu with emojis (A, B, C, D) |
+| `/status` | Displays client profile, registration status, and active request references |
+| `/cancel` | Cancels any ongoing registration or session booking draft |
 | `/about` | Information about Purity Matters |
-| `/ping` | Healthcheck latency test |
+| `/ping` | Server health and latency test |
 | `/help` | Shows command guide |
+
+---
+
+## 🌟 Client Services Features
+
+### 🛋️ A. Counselling
+1. **Select Concern:** Personal, Relationship, Family, Purity & Mindset, Emotional.
+2. **Brief Description:** Describe current challenges or tap `[ ⏩ Skip Sensitive Details ]`.
+3. **Preferred Method:** Telegram Chat, Direct Phone Call, Video Call, or In-Person.
+4. **Preferred Time:** Next Available, Morning (9am-12pm), Afternoon (1pm-5pm), Evening (6pm-9pm).
+5. **Review & Submit:** Detailed review card before confirmation.
+6. **Reference Code:** Auto-generates unique reference number (`CN-XXXXX`) and logs status updates (`PENDING` -> `ASSIGNED` -> `SCHEDULED` -> `COMPLETED`).
+
+### 🕊️ B. Inner Healing
+1. **Choose Topic:** Rejection, Abandonment, Forgiveness, Shame & Guilt, Identity & Worth, Emotional Wounds.
+2. **Instant Minister Notification:** Generates tracking reference (`IH-XXXXX`) and informs client that a minister will communicate with them shortly.
+
+### 📚 C. Training & Courses
+1. **Journey Selection:** 7-Day Journey (Purity & Mindset Triggers) and 21-Day Journey (Freedom & Wholeness).
+2. **Daily Lessons:** Scripture, teaching commentary, trigger reflection questions, and practical action steps.
+3. **Progress Tracking:** Tracks completed days and updates progress indicators.
+4. **Accountability:** Request a dedicated accountability partner at any time.
+
+### 📖 D. Resources & E-Books
+1. **Catalog:** Free practical battle guides and paid transformational e-books.
+2. **Details & Pricing:** Synopsis, chapter breakdown, and price ($4.99 / 250 ETB).
+3. **Checkout & Access:** Server-side verification and instant access under **"My Purchases"**.
+
