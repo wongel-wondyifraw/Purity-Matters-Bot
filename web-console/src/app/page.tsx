@@ -31,6 +31,13 @@ import {
   Layers,
   Radio,
   Check,
+  Copy,
+  Globe,
+  FileText,
+  Shield,
+  User,
+  Eye,
+  CheckCheck,
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,15 +54,27 @@ export interface ClientRecord {
   id: number;
   telegramId: string;
   fullName: string;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  languageCode?: string | null;
   phone: string;
   role: string;
   isRegistered: boolean;
+  registrationStep?: string | null;
+  counselingCount?: number;
+  innerHealingCount?: number;
+  coursesCount?: number;
+  purchasesCount?: number;
+  metadata?: Record<string, any> | null;
   joinedAt: string;
+  updatedAt?: string;
 }
 
 export interface CounselingRecord {
   id: number;
   referenceNumber: string;
+  telegramId?: string;
   clientName: string;
   phone: string;
   concern: string;
@@ -70,6 +89,7 @@ export interface CounselingRecord {
 export interface InnerHealingRecord {
   id: number;
   referenceNumber: string;
+  telegramId?: string;
   clientName: string;
   phone: string;
   topic: string;
@@ -79,6 +99,7 @@ export interface InnerHealingRecord {
 
 export interface CourseProgressRecord {
   id: number;
+  telegramId?: string;
   clientName: string;
   phone?: string;
   courseTitle: string;
@@ -90,6 +111,7 @@ export interface CourseProgressRecord {
 
 export interface ResourceSaleRecord {
   id: number;
+  telegramId?: string;
   clientName: string;
   phone?: string;
   resourceTitle: string;
@@ -105,37 +127,115 @@ const INITIAL_CLIENTS: ClientRecord[] = [
     id: 1,
     telegramId: "109283741",
     fullName: "Dawit Haile",
+    username: "dawithaile",
+    firstName: "Dawit",
+    lastName: "Haile",
+    languageCode: "en",
     phone: "+251911223344",
     role: "client",
     isRegistered: true,
+    registrationStep: "completed",
+    counselingCount: 1,
+    innerHealingCount: 0,
+    coursesCount: 1,
+    purchasesCount: 1,
     joinedAt: "Today, 10:14 AM",
+    updatedAt: "Today, 10:45 AM",
   },
   {
     id: 2,
     telegramId: "982347102",
     fullName: "Selamawit Kebede",
+    username: "selam_k",
+    firstName: "Selamawit",
+    lastName: "Kebede",
+    languageCode: "am",
     phone: "+251922334455",
     role: "client",
     isRegistered: true,
-    joinedAt: "Yesterday",
+    registrationStep: "completed",
+    counselingCount: 0,
+    innerHealingCount: 1,
+    coursesCount: 0,
+    purchasesCount: 1,
+    joinedAt: "Yesterday, 3:20 PM",
+    updatedAt: "Yesterday, 3:25 PM",
   },
   {
     id: 3,
     telegramId: "582910394",
     fullName: "Michael Tadesse",
+    username: "michaelt",
+    firstName: "Michael",
+    lastName: "Tadesse",
+    languageCode: "en",
     phone: "+251933445566",
     role: "client",
     isRegistered: true,
-    joinedAt: "Oct 10, 2026",
+    registrationStep: "completed",
+    counselingCount: 1,
+    innerHealingCount: 0,
+    coursesCount: 1,
+    purchasesCount: 0,
+    joinedAt: "Oct 10, 2026, 09:12 AM",
+    updatedAt: "Oct 10, 2026, 11:30 AM",
   },
   {
     id: 4,
     telegramId: "772910482",
     fullName: "Bethlehem Assefa",
+    username: "beth_a",
+    firstName: "Bethlehem",
+    lastName: "Assefa",
+    languageCode: "en",
     phone: "+251944556677",
     role: "client",
     isRegistered: true,
-    joinedAt: "Oct 09, 2026",
+    registrationStep: "completed",
+    counselingCount: 0,
+    innerHealingCount: 1,
+    coursesCount: 0,
+    purchasesCount: 0,
+    joinedAt: "Oct 09, 2026, 02:45 PM",
+    updatedAt: "Oct 09, 2026, 03:00 PM",
+  },
+  {
+    id: 5,
+    telegramId: "819230182",
+    fullName: "Yared Wolde",
+    username: "yared_w",
+    firstName: "Yared",
+    lastName: "Wolde",
+    languageCode: "am",
+    phone: "+251911998877",
+    role: "client",
+    isRegistered: true,
+    registrationStep: "completed",
+    counselingCount: 1,
+    innerHealingCount: 0,
+    coursesCount: 0,
+    purchasesCount: 0,
+    joinedAt: "Oct 08, 2026, 05:10 PM",
+    updatedAt: "Oct 08, 2026, 05:15 PM",
+  },
+  {
+    id: 6,
+    telegramId: "629104823",
+    fullName: "Kidus Daniel",
+    username: null,
+    firstName: "Kidus",
+    lastName: "Daniel",
+    languageCode: "en",
+    phone: "+251933001122",
+    role: "client",
+    isRegistered: true,
+    registrationStep: "completed",
+    counselingCount: 0,
+    innerHealingCount: 1,
+    coursesCount: 0,
+    purchasesCount: 0,
+    joinedAt: "Oct 06, 2026, 11:30 AM",
+    updatedAt: "Oct 06, 2026, 11:45 AM",
   },
 ];
 
@@ -143,6 +243,7 @@ const INITIAL_COUNSELING: CounselingRecord[] = [
   {
     id: 1,
     referenceNumber: "CN-84920",
+    telegramId: "109283741",
     clientName: "Dawit Haile",
     phone: "+251911223344",
     concern: "Purity & Mindset Concern",
@@ -155,6 +256,7 @@ const INITIAL_COUNSELING: CounselingRecord[] = [
   {
     id: 2,
     referenceNumber: "CN-71829",
+    telegramId: "582910394",
     clientName: "Michael Tadesse",
     phone: "+251933445566",
     concern: "Relationship Concern",
@@ -168,6 +270,7 @@ const INITIAL_COUNSELING: CounselingRecord[] = [
   {
     id: 3,
     referenceNumber: "CN-63910",
+    telegramId: "819230182",
     clientName: "Yared Wolde",
     phone: "+251911998877",
     concern: "Personal Concern",
@@ -184,6 +287,7 @@ const INITIAL_INNER_HEALING: InnerHealingRecord[] = [
   {
     id: 1,
     referenceNumber: "IH-38291",
+    telegramId: "982347102",
     clientName: "Selamawit Kebede",
     phone: "+251922334455",
     topic: "Rejection & Healing from Hurt",
@@ -193,6 +297,7 @@ const INITIAL_INNER_HEALING: InnerHealingRecord[] = [
   {
     id: 2,
     referenceNumber: "IH-29183",
+    telegramId: "772910482",
     clientName: "Bethlehem Assefa",
     phone: "+251944556677",
     topic: "Shame & Guilt Removal",
@@ -202,6 +307,7 @@ const INITIAL_INNER_HEALING: InnerHealingRecord[] = [
   {
     id: 3,
     referenceNumber: "IH-10928",
+    telegramId: "629104823",
     clientName: "Kidus Daniel",
     phone: "+251933001122",
     topic: "Identity & God-given Worth",
@@ -213,6 +319,7 @@ const INITIAL_INNER_HEALING: InnerHealingRecord[] = [
 const INITIAL_COURSES: CourseProgressRecord[] = [
   {
     id: 1,
+    telegramId: "109283741",
     clientName: "Dawit Haile",
     phone: "+251911223344",
     courseTitle: "🌅 7-Day Journey: Overcoming Triggers",
@@ -223,6 +330,7 @@ const INITIAL_COURSES: CourseProgressRecord[] = [
   },
   {
     id: 2,
+    telegramId: "582910394",
     clientName: "Michael Tadesse",
     phone: "+251933445566",
     courseTitle: "🌱 21-Day Journey: Walking in Freedom",
@@ -236,6 +344,7 @@ const INITIAL_COURSES: CourseProgressRecord[] = [
 const INITIAL_SALES: ResourceSaleRecord[] = [
   {
     id: 1,
+    telegramId: "109283741",
     clientName: "Dawit Haile",
     phone: "+251911223344",
     resourceTitle: "📖 Breaking Chains: The Wholeness Journey (E-Book)",
@@ -246,6 +355,7 @@ const INITIAL_SALES: ResourceSaleRecord[] = [
   },
   {
     id: 2,
+    telegramId: "982347102",
     clientName: "Selamawit Kebede",
     phone: "+251922334455",
     resourceTitle: "🕊️ Healing Father & Mother Wounds (E-Book)",
@@ -257,8 +367,9 @@ const INITIAL_SALES: ResourceSaleRecord[] = [
 ];
 
 export default function AdminConsolePage() {
-  const [activeTab, setActiveTab] = useState<string>("counselling");
+  const [activeTab, setActiveTab] = useState<string>("clients");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [counselingFilter, setCounselingFilter] = useState<string>("all");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://bot-api.puritymattersethiopia.com";
@@ -268,6 +379,8 @@ export default function AdminConsolePage() {
   const [lastSyncTime, setLastSyncTime] = useState<string>("Just now");
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Entities state
   const [clients, setClients] = useState<ClientRecord[]>(INITIAL_CLIENTS);
@@ -275,6 +388,13 @@ export default function AdminConsolePage() {
   const [innerHealingRequests, setInnerHealingRequests] = useState<InnerHealingRecord[]>(INITIAL_INNER_HEALING);
   const [courseProgressList, setCourseProgressList] = useState<CourseProgressRecord[]>(INITIAL_COURSES);
   const [resourceSales, setResourceSales] = useState<ResourceSaleRecord[]>(INITIAL_SALES);
+
+  // Copy helper
+  const copyToClipboard = (text: string, idKey: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedId(idKey);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Format dates helper
   const formatDateTime = (dateVal: string | Date | undefined) => {
@@ -330,11 +450,22 @@ export default function AdminConsolePage() {
           const mappedClients: ClientRecord[] = rawClients.map((item: any) => ({
             id: item.id,
             telegramId: String(item.telegramId),
-            fullName: item.fullName || item.firstName || `User #${item.telegramId}`,
+            fullName: item.fullName || (item.firstName ? `${item.firstName} ${item.lastName || ""}`.trim() : `User #${item.telegramId}`),
+            username: item.username || null,
+            firstName: item.firstName || null,
+            lastName: item.lastName || null,
+            languageCode: item.languageCode || "en",
             phone: item.phone || "Not shared",
             role: item.role || "client",
             isRegistered: !!item.isRegistered,
+            registrationStep: item.registrationStep || (item.isRegistered ? "completed" : "pending"),
+            counselingCount: item.counselingCount ?? 0,
+            innerHealingCount: item.innerHealingCount ?? 0,
+            coursesCount: item.coursesCount ?? 0,
+            purchasesCount: item.purchasesCount ?? 0,
+            metadata: item.metadata || {},
             joinedAt: formatDateTime(item.createdAt),
+            updatedAt: formatDateTime(item.updatedAt || item.createdAt),
           }));
           setClients(mappedClients);
           hasLiveData = true;
@@ -348,6 +479,7 @@ export default function AdminConsolePage() {
           const mappedCounseling: CounselingRecord[] = rawCounseling.map((item: any) => ({
             id: item.id,
             referenceNumber: item.referenceNumber || `CN-${item.id}`,
+            telegramId: String(item.telegramId),
             clientName: item.clientName || "Client",
             phone: item.phone || "N/A",
             concern: item.concern || "General Counseling",
@@ -370,6 +502,7 @@ export default function AdminConsolePage() {
           const mappedHealing: InnerHealingRecord[] = rawHealing.map((item: any) => ({
             id: item.id,
             referenceNumber: item.referenceNumber || `IH-${item.id}`,
+            telegramId: String(item.telegramId),
             clientName: item.clientName || "Client",
             phone: item.phone || "N/A",
             topic: item.topic || "Inner Healing Topic",
@@ -387,6 +520,7 @@ export default function AdminConsolePage() {
         if (Array.isArray(rawCourses) && rawCourses.length > 0) {
           const mappedCourses: CourseProgressRecord[] = rawCourses.map((item: any) => ({
             id: item.id,
+            telegramId: String(item.telegramId),
             clientName: item.clientName || `User #${item.telegramId}`,
             phone: item.phone || "N/A",
             courseTitle:
@@ -411,6 +545,7 @@ export default function AdminConsolePage() {
         if (Array.isArray(rawSales) && rawSales.length > 0) {
           const mappedSales: ResourceSaleRecord[] = rawSales.map((item: any) => ({
             id: item.id,
+            telegramId: String(item.telegramId),
             clientName: item.clientName || `User #${item.telegramId}`,
             phone: item.phone || "N/A",
             resourceTitle: item.resourceTitle || item.resourceId,
@@ -440,9 +575,40 @@ export default function AdminConsolePage() {
     syncWithRemoteBackend();
   }, [syncWithRemoteBackend]);
 
+  // Action: Forward Client role update to remote backend
+  const updateClientRole = async (id: number, role: string) => {
+    setClients((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, role } : c))
+    );
+    if (selectedClient && selectedClient.id === id) {
+      setSelectedClient({ ...selectedClient, role });
+    }
+
+    setActionNotice(`Updating Client #${id} role to ${role.toUpperCase()}...`);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/admin/clients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+
+      if (res.ok) {
+        setActionNotice(`Success: Client #${id} role updated to ${role.toUpperCase()} in remote PostgreSQL.`);
+      } else {
+        setActionNotice(`Updated in Console preview.`);
+      }
+    } catch {
+      setActionNotice(`Updated in Console preview.`);
+    }
+
+    setTimeout(() => {
+      setActionNotice(null);
+    }, 4500);
+  };
+
   // Action: Forward Counseling update to remote backend
   const updateCounselingStatus = async (id: number, status: CounselingRecord["status"], assignedTo?: string) => {
-    // 1. Optimistic UI update
     setCounselingRequests((prev) =>
       prev.map((req) => (req.id === id ? { ...req, status, ...(assignedTo ? { assignedTo } : {}) } : req))
     );
@@ -472,7 +638,6 @@ export default function AdminConsolePage() {
 
   // Action: Forward Inner Healing update to remote backend
   const updateInnerHealingStatus = async (id: number, status: InnerHealingRecord["status"]) => {
-    // 1. Optimistic UI update
     setInnerHealingRequests((prev) =>
       prev.map((req) => (req.id === id ? { ...req, status } : req))
     );
@@ -500,18 +665,53 @@ export default function AdminConsolePage() {
     }, 4500);
   };
 
-  // Filters
+  // Export Clients to CSV
+  const exportClientsCsv = () => {
+    const headers = ["ID", "Telegram_ID", "Full_Name", "Username", "Phone", "Role", "Registered", "Language", "Counseling_Count", "Healing_Count", "Joined_At"];
+    const rows = clients.map((c) => [
+      c.id,
+      `"${c.telegramId}"`,
+      `"${c.fullName}"`,
+      `"${c.username || ""}"`,
+      `"${c.phone}"`,
+      c.role,
+      c.isRegistered ? "YES" : "NO",
+      c.languageCode || "en",
+      c.counselingCount || 0,
+      c.innerHealingCount || 0,
+      `"${c.joinedAt}"`,
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `purity_matters_clients_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filtered lists
+  const filteredClients = clients.filter((c) => {
+    const matchesSearch =
+      c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.phone.includes(searchQuery) ||
+      c.telegramId.includes(searchQuery) ||
+      (c.username && c.username.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (clientFilter === "verified") return c.isRegistered;
+    if (clientFilter === "in-progress") return !c.isRegistered;
+    if (clientFilter === "admin") return c.role === "admin";
+    return true;
+  });
+
   const filteredCounseling = counselingRequests.filter((req) => {
     if (counselingFilter === "all") return true;
     return req.status === counselingFilter;
   });
-
-  const filteredClients = clients.filter(
-    (c) =>
-      c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone.includes(searchQuery) ||
-      c.telegramId.includes(searchQuery)
-  );
 
   return (
     <div id="admin-console-root" className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
@@ -574,20 +774,20 @@ export default function AdminConsolePage() {
               <span>Remote PostgreSQL Schema:</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Badge variant="outline" className="font-mono text-[11px] bg-slate-50 border-slate-200 text-slate-700 font-normal">
-                client
+              <Badge variant="outline" className="font-mono text-[11px] bg-emerald-50 border-emerald-300 text-emerald-800 font-medium">
+                client ({clients.length})
               </Badge>
               <Badge variant="outline" className="font-mono text-[11px] bg-slate-50 border-slate-200 text-slate-700 font-normal">
-                counseling_request
+                counseling_request ({counselingRequests.length})
               </Badge>
               <Badge variant="outline" className="font-mono text-[11px] bg-slate-50 border-slate-200 text-slate-700 font-normal">
-                inner_healing_request
+                inner_healing_request ({innerHealingRequests.length})
               </Badge>
               <Badge variant="outline" className="font-mono text-[11px] bg-slate-50 border-slate-200 text-slate-700 font-normal">
-                course_progress
+                course_progress ({courseProgressList.length})
               </Badge>
               <Badge variant="outline" className="font-mono text-[11px] bg-slate-50 border-slate-200 text-slate-700 font-normal">
-                resource_purchase
+                resource_purchase ({resourceSales.length})
               </Badge>
             </div>
           </div>
@@ -745,14 +945,14 @@ export default function AdminConsolePage() {
         <section id="console-tabs-section">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="bg-slate-200/70 border border-slate-200 p-1 rounded-xl">
+              <TabsTrigger value="clients" className="data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-xs text-slate-600 font-medium">
+                👥 Clients Directory ({clients.length})
+              </TabsTrigger>
               <TabsTrigger value="counselling" className="data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-xs text-slate-600 font-medium">
                 🛋️ Counselling ({counselingRequests.length})
               </TabsTrigger>
               <TabsTrigger value="inner-healing" className="data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-xs text-slate-600 font-medium">
                 🕊️ Inner Healing ({innerHealingRequests.length})
-              </TabsTrigger>
-              <TabsTrigger value="clients" className="data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-xs text-slate-600 font-medium">
-                👥 Clients Directory ({clients.length})
               </TabsTrigger>
               <TabsTrigger value="courses" className="data-[state=active]:bg-white data-[state=active]:text-emerald-800 data-[state=active]:shadow-xs text-slate-600 font-medium">
                 📚 Courses & Accountability ({courseProgressList.length})
@@ -762,7 +962,366 @@ export default function AdminConsolePage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* TAB 1: COUNSELLING MANAGEMENT */}
+            {/* TAB 1: CLIENTS DIRECTORY (PRIMARY CLIENT DATA TABLE) */}
+            <TabsContent value="clients" className="space-y-4">
+              <Card className="bg-white border-slate-200/90 shadow-xs">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <span>Registered Clients Directory</span>
+                      <Badge variant="outline" className="border-emerald-300 text-emerald-800 bg-emerald-50 text-xs font-mono">
+                        Table: client
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-slate-500">
+                      Accurate client records from PostgreSQL with verified phone numbers, Telegram usernames, and activity history.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-64">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <Input
+                        placeholder="Search name, phone, @user, ID..."
+                        className="bg-slate-50 border-slate-200 pl-9 text-xs text-slate-900 shadow-2xs focus:bg-white"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    <select
+                      className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 text-slate-700 font-medium shadow-2xs focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer h-9"
+                      value={clientFilter}
+                      onChange={(e) => setClientFilter(e.target.value)}
+                    >
+                      <option value="all">All Registrations</option>
+                      <option value="verified">Verified (Has Phone)</option>
+                      <option value="in-progress">In-Progress</option>
+                      <option value="admin">Administrators</option>
+                    </select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportClientsCsv}
+                      className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs h-9 cursor-pointer shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pt-4">
+                  {/* Client Metrics Strip */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <div className="text-xs text-slate-500 font-medium">Total Clients</div>
+                      <div className="text-lg font-bold text-slate-900">{clients.length}</div>
+                    </div>
+                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/70 rounded-lg">
+                      <div className="text-xs text-emerald-800 font-medium">Verified Contacts</div>
+                      <div className="text-lg font-bold text-emerald-900">
+                        {clients.filter((c) => c.isRegistered).length}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-sky-50/70 border border-sky-200/70 rounded-lg">
+                      <div className="text-xs text-sky-800 font-medium">With Telegram Handle</div>
+                      <div className="text-lg font-bold text-sky-900">
+                        {clients.filter((c) => c.username).length}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-violet-50/70 border border-violet-200/70 rounded-lg">
+                      <div className="text-xs text-violet-800 font-medium">Active Inquiries</div>
+                      <div className="text-lg font-bold text-violet-900">
+                        {clients.reduce((acc, c) => acc + (c.counselingCount || 0) + (c.innerHealingCount || 0), 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clients Table */}
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+                          <TableHead className="text-slate-600 font-semibold text-xs w-16">ID</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Client & Handle</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Telegram ID</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Verified Phone</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Status</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Role</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Activity</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs">Joined</TableHead>
+                          <TableHead className="text-slate-600 font-semibold text-xs text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredClients.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-slate-500 text-sm">
+                              No clients found matching your search criteria.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredClients.map((client) => (
+                            <TableRow key={client.id} className="border-slate-100 hover:bg-slate-50/70 transition-colors">
+                              <TableCell className="font-mono text-slate-500 text-xs font-semibold">
+                                #{client.id}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2.5">
+                                  <Avatar className="w-8 h-8 border border-slate-200 text-xs">
+                                    <AvatarFallback className="bg-emerald-100 text-emerald-800 font-semibold text-xs">
+                                      {client.fullName
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .slice(0, 2)
+                                        .toUpperCase() || "CL"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                                      <span>{client.fullName}</span>
+                                      {client.languageCode && (
+                                        <span className="text-[10px] font-mono uppercase bg-slate-100 border border-slate-200 text-slate-600 px-1 py-0.5 rounded">
+                                          {client.languageCode}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-slate-500 font-mono">
+                                      {client.username ? `@${client.username}` : "No username"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+
+                              <TableCell>
+                                <div className="flex items-center gap-1 font-mono text-xs text-slate-700 bg-slate-100 px-2 py-1 rounded w-max border border-slate-200/80">
+                                  <span>{client.telegramId}</span>
+                                  <button
+                                    onClick={() => copyToClipboard(client.telegramId, `tid-${client.id}`)}
+                                    title="Copy Telegram ID"
+                                    className="text-slate-400 hover:text-slate-700 cursor-pointer ml-1"
+                                  >
+                                    {copiedId === `tid-${client.id}` ? (
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </TableCell>
+
+                              <TableCell>
+                                <div className="flex items-center gap-1 font-mono text-xs text-slate-800 font-semibold">
+                                  <span>{client.phone}</span>
+                                  {client.phone && client.phone.startsWith("+") && (
+                                    <button
+                                      onClick={() => copyToClipboard(client.phone, `ph-${client.id}`)}
+                                      title="Copy Phone Number"
+                                      className="text-slate-400 hover:text-slate-700 cursor-pointer ml-1"
+                                    >
+                                      {copiedId === `ph-${client.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell>
+                                {client.isRegistered ? (
+                                  <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 font-medium text-xs flex items-center gap-1 w-max">
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    <span>Verified</span>
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-amber-50 text-amber-800 border-amber-200 font-medium text-xs w-max">
+                                    Awaiting Phone
+                                  </Badge>
+                                )}
+                              </TableCell>
+
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    client.role === "admin"
+                                      ? "border-violet-300 text-violet-800 bg-violet-50 font-semibold text-xs"
+                                      : "border-slate-200 text-slate-700 bg-slate-50 font-medium text-xs"
+                                  }
+                                >
+                                  {client.role.toUpperCase()}
+                                </Badge>
+                              </TableCell>
+
+                              <TableCell>
+                                <div className="flex items-center gap-1 text-xs">
+                                  {(client.counselingCount || 0) > 0 && (
+                                    <span className="bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded font-mono" title="Counselling Sessions">
+                                      🛋️ {client.counselingCount}
+                                    </span>
+                                  )}
+                                  {(client.innerHealingCount || 0) > 0 && (
+                                    <span className="bg-violet-50 text-violet-800 border border-violet-200 px-1.5 py-0.5 rounded font-mono" title="Inner Healing Requests">
+                                      🕊️ {client.innerHealingCount}
+                                    </span>
+                                  )}
+                                  {(client.coursesCount || 0) > 0 && (
+                                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded font-mono" title="Enrolled Courses">
+                                      📚 {client.coursesCount}
+                                    </span>
+                                  )}
+                                  {((client.counselingCount || 0) === 0 && (client.innerHealingCount || 0) === 0 && (client.coursesCount || 0) === 0) && (
+                                    <span className="text-slate-400 text-xs">New user</span>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-slate-500 text-xs font-mono">{client.joinedAt}</TableCell>
+
+                              <TableCell className="text-right">
+                                <Dialog>
+                                  <DialogTrigger
+                                    onClick={() => setSelectedClient(client)}
+                                    className="inline-flex items-center justify-center rounded-md text-xs font-semibold transition-colors hover:bg-emerald-50 border border-emerald-200/80 h-7 px-3 text-emerald-700 hover:text-emerald-800 cursor-pointer shadow-2xs"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 mr-1" />
+                                    Profile
+                                  </DialogTrigger>
+
+                                  <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-lg shadow-xl">
+                                    <DialogHeader>
+                                      <DialogTitle className="text-slate-900 font-bold flex items-center gap-2">
+                                        <Avatar className="w-7 h-7 border border-slate-200">
+                                          <AvatarFallback className="bg-emerald-600 text-white font-bold text-xs">
+                                            {client.fullName.slice(0, 2).toUpperCase()}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <span>Client Dossier: {client.fullName}</span>
+                                      </DialogTitle>
+                                      <DialogDescription className="text-slate-500">
+                                        PostgreSQL Record # {client.id} (Table: public.client)
+                                      </DialogDescription>
+                                    </DialogHeader>
+
+                                    <div className="space-y-4 py-2 text-xs">
+                                      {/* Info Box */}
+                                      <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Telegram ID:</span>
+                                          <p className="font-mono font-bold text-slate-800">{client.telegramId}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Username:</span>
+                                          <p className="font-mono font-bold text-slate-800">{client.username ? `@${client.username}` : "None"}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Phone:</span>
+                                          <p className="font-mono font-bold text-emerald-700">{client.phone}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Registration Status:</span>
+                                          <p className="font-bold text-slate-800">{client.isRegistered ? "Verified via Bot" : "In Progress"}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Language:</span>
+                                          <p className="font-bold text-slate-800 uppercase">{client.languageCode || "en"}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-500 font-medium">Registration Date:</span>
+                                          <p className="text-slate-700">{client.joinedAt}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Service History in Bot */}
+                                      <div className="space-y-2">
+                                        <h5 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Service Involvements</h5>
+                                        <div className="space-y-1.5">
+                                          {counselingRequests
+                                            .filter((cr) => cr.telegramId === client.telegramId || cr.phone === client.phone)
+                                            .map((cr) => (
+                                              <div key={cr.id} className="p-2 border border-slate-200 rounded flex items-center justify-between bg-sky-50/40">
+                                                <span className="font-mono font-bold text-sky-800">{cr.referenceNumber}</span>
+                                                <span className="text-slate-700">{cr.concern}</span>
+                                                <Badge className="text-[10px] bg-sky-100 text-sky-800 border-sky-200">{cr.status.toUpperCase()}</Badge>
+                                              </div>
+                                            ))}
+
+                                          {innerHealingRequests
+                                            .filter((ih) => ih.telegramId === client.telegramId || ih.phone === client.phone)
+                                            .map((ih) => (
+                                              <div key={ih.id} className="p-2 border border-slate-200 rounded flex items-center justify-between bg-violet-50/40">
+                                                <span className="font-mono font-bold text-violet-800">{ih.referenceNumber}</span>
+                                                <span className="text-slate-700">{ih.topic}</span>
+                                                <Badge className="text-[10px] bg-violet-100 text-violet-800 border-violet-200">{ih.status.toUpperCase()}</Badge>
+                                              </div>
+                                            ))}
+
+                                          {courseProgressList
+                                            .filter((cp) => cp.telegramId === client.telegramId || cp.phone === client.phone)
+                                            .map((cp) => (
+                                              <div key={cp.id} className="p-2 border border-slate-200 rounded flex items-center justify-between bg-emerald-50/40">
+                                                <span className="text-slate-700 font-semibold">{cp.courseTitle}</span>
+                                                <span className="font-bold text-emerald-700">Day {cp.currentDay} / {cp.totalDays}</span>
+                                              </div>
+                                            ))}
+
+                                          {counselingRequests.filter((cr) => cr.telegramId === client.telegramId).length === 0 &&
+                                            innerHealingRequests.filter((ih) => ih.telegramId === client.telegramId).length === 0 &&
+                                            courseProgressList.filter((cp) => cp.telegramId === client.telegramId).length === 0 && (
+                                              <p className="text-slate-400 italic">No bookings or course progress recorded yet for this client.</p>
+                                            )}
+                                        </div>
+                                      </div>
+
+                                      {/* Role Management */}
+                                      <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                                        <div className="text-xs text-slate-500">
+                                          Current Role: <span className="font-bold text-slate-800 uppercase">{client.role}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          {client.role === "client" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => updateClientRole(client.id, "admin")}
+                                              className="text-xs text-violet-700 border-violet-200 hover:bg-violet-50 cursor-pointer"
+                                            >
+                                              <Shield className="w-3.5 h-3.5 mr-1" />
+                                              Promote to Admin
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => updateClientRole(client.id, "client")}
+                                              className="text-xs text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                              <User className="w-3.5 h-3.5 mr-1" />
+                                              Set as Client
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* TAB 2: COUNSELLING MANAGEMENT */}
             <TabsContent value="counselling" className="space-y-4">
               <Card className="bg-white border-slate-200/90 shadow-xs">
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
@@ -894,7 +1453,7 @@ export default function AdminConsolePage() {
               </Card>
             </TabsContent>
 
-            {/* TAB 2: INNER HEALING SESSIONS */}
+            {/* TAB 3: INNER HEALING SESSIONS */}
             <TabsContent value="inner-healing" className="space-y-4">
               <Card className="bg-white border-slate-200/90 shadow-xs">
                 <CardHeader className="border-b border-slate-100 pb-4">
@@ -971,66 +1530,6 @@ export default function AdminConsolePage() {
                                 </Badge>
                               )}
                             </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* TAB 3: CLIENT DIRECTORY */}
-            <TabsContent value="clients" className="space-y-4">
-              <Card className="bg-white border-slate-200/90 shadow-xs">
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                  <div>
-                    <CardTitle className="text-lg font-bold text-slate-900">Registered Clients (Table: client)</CardTitle>
-                    <CardDescription className="text-slate-500">
-                      All users synced from Telegram with verified contact numbers and role = client.
-                    </CardDescription>
-                  </div>
-
-                  <div className="relative w-full sm:w-64">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                    <Input
-                      placeholder="Search name, phone, ID..."
-                      className="bg-slate-50 border-slate-200 pl-9 text-xs text-slate-900 shadow-2xs focus:bg-white"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-slate-200 bg-slate-50/70 hover:bg-slate-50/70">
-                          <TableHead className="text-slate-600 font-semibold text-xs">Telegram ID</TableHead>
-                          <TableHead className="text-slate-600 font-semibold text-xs">Full Name</TableHead>
-                          <TableHead className="text-slate-600 font-semibold text-xs">Phone</TableHead>
-                          <TableHead className="text-slate-600 font-semibold text-xs">Role</TableHead>
-                          <TableHead className="text-slate-600 font-semibold text-xs">Status</TableHead>
-                          <TableHead className="text-slate-600 font-semibold text-xs">Registered At</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredClients.map((client) => (
-                          <TableRow key={client.id} className="border-slate-100 hover:bg-slate-50/80 transition-colors">
-                            <TableCell className="font-mono text-slate-500 text-xs">{client.telegramId}</TableCell>
-                            <TableCell className="font-semibold text-slate-900">{client.fullName}</TableCell>
-                            <TableCell className="text-slate-700 text-sm font-mono">{client.phone}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="border-emerald-200 text-emerald-800 bg-emerald-50 font-medium">
-                                {client.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 font-medium">
-                                {client.isRegistered ? "Verified" : "Pending"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-slate-500 text-sm">{client.joinedAt}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

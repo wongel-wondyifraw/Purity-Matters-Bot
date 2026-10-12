@@ -123,6 +123,17 @@ export class ClientsService {
     return this.clientRepository.find({ order: { createdAt: 'DESC' } });
   }
 
+  async findById(id: number): Promise<Client | null> {
+    return this.clientRepository.findOne({ where: { id } });
+  }
+
+  async updateRole(id: number, role: string): Promise<Client | null> {
+    const client = await this.findById(id);
+    if (!client) return null;
+    client.role = role;
+    return this.clientRepository.save(client);
+  }
+
   async count(): Promise<number> {
     return this.clientRepository.count();
   }

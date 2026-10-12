@@ -51,7 +51,61 @@ export class AdminController {
 
   @Get('clients')
   async getClients() {
-    return this.clientsService.findAll();
+    const [clients, counseling, innerHealing, courses, purchases] = await Promise.all([
+      this.clientsService.findAll(),
+      this.counselingService.findAll(),
+      this.innerHealingService.findAll(),
+      this.coursesService.getAllProgress(),
+      this.resourcesService.getAllPurchases(),
+    ]);
+
+    const counselingMap = new Map<string, number>();
+    for (const c of counseling) {
+      const tid = String(c.telegramId);
+      counselingMap.set(tid, (counselingMap.get(tid) || 0) + 1);
+    }
+
+    const innerHealingMap = new Map<string, number>();
+    for (const ih of innerHealing) {
+      const tid = String(ih.telegramId);
+      innerHealingMap.set(tid, (innerHealingMap.get(tid) || 0) + 1);
+    }
+
+    const coursesMap = new Map<string, number>();
+    for (const cp of courses) {
+      const tid = String(cp.telegramId);
+      coursesMap.set(tid, (coursesMap.get(tid) || 0) + 1);
+    }
+
+    const purchasesMap = new Map<string, number>();
+    for (const rp of purchases) {
+      const tid = String(rp.telegramId);
+      purchasesMap.set(tid, (purchasesMap.get(tid) || 0) + 1);
+    }
+
+    return clients.map((c) => {
+      const tid = String(c.telegramId);
+      return {
+        ...c,
+        counselingCount: counselingMap.get(tid) || 0,
+        innerHealingCount: innerHealingMap.get(tid) || 0,
+        coursesCount: coursesMap.get(tid) || 0,
+        purchasesCount: purchasesMap.get(tid) || 0,
+      };
+    });
+  }
+
+  @Patch('clients/:id')
+  async updateClient(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { role?: string; phone?: string; fullName?: string },
+  ) {
+    const client = await this.clientsService.findById(id);
+    if (!client) return null;
+    if (body.role !== undefined) client.role = body.role;
+    if (body.phone !== undefined) client.phone = body.phone;
+    if (body.fullName !== undefined) client.fullName = body.fullName;
+    return this.clientsService.saveClient(client);
   }
 
   @Get('counseling')
