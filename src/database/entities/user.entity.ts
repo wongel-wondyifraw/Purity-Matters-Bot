@@ -9,8 +9,8 @@ import {
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Index({ unique: true })
   @Column({ type: 'bigint' })
