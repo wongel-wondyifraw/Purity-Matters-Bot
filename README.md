@@ -20,24 +20,18 @@ A scalable, modular Telegram bot backend built with [NestJS](https://nestjs.com/
 ```
 ├── app.js                       # cPanel / Phusion Passenger Node.js entrypoint
 ├── CPANEL_DEPLOYMENT.md         # Complete cPanel deployment manual
+├── web-console/                 # Next.js 16 + shadcn/ui Admin Management Portal
+│   ├── src/app/page.tsx         # Interactive Admin Dashboard & Management Console
+│   └── src/components/ui/       # shadcn/ui components (cards, tables, badges, tabs, dialogs)
 src/
 ├── app.controller.ts            # Root health check endpoints (/ & /health)
 ├── app.module.ts                # Main application module
 ├── app.service.ts               # Core app services
 ├── main.ts                      # App bootstrap & webhook middleware registration
-├── bot/
-│   ├── bot.interface.ts         # Telegraf Context extensions
-│   ├── bot.module.ts            # Dynamic TelegrafModule integration
-│   ├── bot.service.ts           # Bot messaging, markup & templates
-│   └── bot.update.ts            # Telegram command & callback handlers
-├── config/
-│   └── configuration.ts         # Strongly-typed environment variables loader
-├── database/
-│   └── entities/
-│       └── client.entity.ts     # Telegram Client entity (table: 'client')
-└── clients/
-    ├── clients.module.ts        # Client management module
-    └── clients.service.ts       # Telegram client upsert & registration logic
+├── bot/                         # Telegram Bot handlers & services
+├── config/                      # Environment variables loader
+├── database/                    # TypeORM PostgreSQL entities
+└── clients/                     # Telegram client management
 ```
 
 ---
@@ -96,6 +90,17 @@ npm run start:prod
 
 ```bash
 npm run test
+```
+
+### 5. Running Purity Matters Web Console (Admin Dashboard)
+
+```bash
+# Start Admin Web Console in development mode (http://localhost:3001)
+npm run web:dev
+
+# Build Admin Web Console for production
+npm run web:build
+npm run web:start
 ```
 
 ---

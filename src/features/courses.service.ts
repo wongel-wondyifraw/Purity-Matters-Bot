@@ -120,4 +120,12 @@ export class CoursesService {
     progress.accountabilityRequested = true;
     return this.progressRepo.save(progress);
   }
+
+  async getAllProgress(): Promise<CourseProgress[]> {
+    return this.progressRepo.find({ order: { updatedAt: 'DESC' } });
+  }
+
+  async count(): Promise<number> {
+    return this.progressRepo.count();
+  }
 }

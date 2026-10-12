@@ -79,4 +79,22 @@ export class CounselingService {
       order: { createdAt: 'DESC' },
     });
   }
+
+  async findAll(): Promise<CounselingRequest[]> {
+    return this.requestRepo.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async count(): Promise<number> {
+    return this.requestRepo.count();
+  }
+
+  async updateStatus(id: number, status: string, assignedTo?: string): Promise<CounselingRequest | null> {
+    const req = await this.requestRepo.findOne({ where: { id } });
+    if (!req) return null;
+    req.status = status;
+    if (assignedTo !== undefined) {
+      req.assignedTo = assignedTo;
+    }
+    return this.requestRepo.save(req);
+  }
 }

@@ -10,6 +10,7 @@ import { ResourcePurchase } from './database/entities/resource-purchase.entity.j
 import { ClientsModule } from './clients/clients.module.js';
 import { FeaturesModule } from './features/features.module.js';
 import { BotModule } from './bot/bot.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -44,6 +45,7 @@ import { AppService } from './app.service.js';
     ClientsModule,
     FeaturesModule,
     BotModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

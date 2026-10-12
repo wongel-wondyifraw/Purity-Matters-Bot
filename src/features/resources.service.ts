@@ -105,4 +105,14 @@ export class ResourcesService {
       order: { createdAt: 'DESC' },
     });
   }
+
+  async getAllPurchases(): Promise<ResourcePurchase[]> {
+    return this.purchaseRepo.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async countPurchases(): Promise<number> {
+    return this.purchaseRepo.count();
+  }
 }

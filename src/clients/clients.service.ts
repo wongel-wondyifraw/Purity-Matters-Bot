@@ -118,4 +118,12 @@ export class ClientsService {
     client.registrationStep = null;
     return this.clientRepository.save(client);
   }
+
+  async findAll(): Promise<Client[]> {
+    return this.clientRepository.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async count(): Promise<number> {
+    return this.clientRepository.count();
+  }
 }

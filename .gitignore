@@ -2,6 +2,8 @@
 /dist
 /node_modules
 /build
+/web-console/.next
+/web-console/node_modules
 
 # TypeScript build cache
 *.tsbuildinfo

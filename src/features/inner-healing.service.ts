@@ -46,4 +46,19 @@ export class InnerHealingService {
       order: { createdAt: 'DESC' },
     });
   }
+
+  async findAll(): Promise<InnerHealingRequest[]> {
+    return this.requestRepo.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async count(): Promise<number> {
+    return this.requestRepo.count();
+  }
+
+  async updateStatus(id: number, status: string): Promise<InnerHealingRequest | null> {
+    const req = await this.requestRepo.findOne({ where: { id } });
+    if (!req) return null;
+    req.status = status;
+    return this.requestRepo.save(req);
+  }
 }
