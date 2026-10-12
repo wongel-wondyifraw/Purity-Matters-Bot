@@ -11,11 +11,31 @@ export class BotService {
   getWelcomeMessage(client: Client): string {
     const name = client.fullName ?? client.firstName ?? client.username ?? 'Friend';
     return (
-      `👋 *Welcome, ${name}\\!* to the *Purity Matters Bot*\\.\n\n` +
-      `We are dedicated to helping you live a life of wholeness, freedom, and divine purpose\\.\n\n` +
-      `📋 *Your Status:* ${client.isRegistered ? '✅ Registered Client' : '⏳ Guest / Not Registered'}\n\n` +
-      `Use the buttons below to explore our services or get started\\.`
+      `👋 <b>Welcome, ${name}!</b> to the <b>Purity Matters Bot</b>.\n\n` +
+      `We are dedicated to helping you live a life of wholeness, freedom, and divine purpose.\n\n` +
+      `📋 <b>Your Status:</b> ${client.isRegistered ? '✅ Registered Client' : '⏳ Guest / Not Registered'}\n\n` +
+      `Use the persistent menu buttons below to explore our services or get started.`
     );
+  }
+
+  // --- Sticky Bottom Persistent Keyboard ---
+  getBottomPersistentKeyboard(isRegistered = false) {
+    if (isRegistered) {
+      return Markup.keyboard([
+        ['🛋️ A. Counselling', '🕊️ B. Inner Healing'],
+        ['📚 C. Training & Courses', '📖 D. Resources & E-Books'],
+        ['👤 My Profile', 'ℹ️ About Us'],
+      ])
+        .resize()
+        .persistent();
+    }
+
+    return Markup.keyboard([
+      ['✨ Register as Client', 'ℹ️ About Us'],
+      ['📋 My Status', '❓ Help'],
+    ])
+      .resize()
+      .persistent();
   }
 
   getMainKeyboard(isRegistered = false) {
@@ -46,12 +66,12 @@ export class BotService {
 
   getServicesMenuMessage(): string {
     return (
-      `🌟 *Purity Matters Services Menu*\n\n` +
-      `Please select a service below to begin:\n\n` +
-      `🛋️ *A. Counselling* — Confidential 1-on-1 support for personal, family, relationship, or purity concerns.\n` +
-      `🕊️ *B. Inner Healing* — Healing prayer and restoration for rejection, abandonment, and emotional wounds.\n` +
-      `📚 *C. Training & Courses* — 7-day and 21-day structured transformation journeys.\n` +
-      `📖 *D. Resources & E-Books* — Essential guides, workbooks, and paid e-books for your walk.`
+      `🌟 <b>Purity Matters Services Menu</b>\n\n` +
+      `Please select a service using the buttons below:\n\n` +
+      `🛋️ <b>A. Counselling</b> — Confidential 1-on-1 support for personal, family, relationship, or purity concerns.\n\n` +
+      `🕊️ <b>B. Inner Healing</b> — Healing prayer and restoration for rejection, abandonment, and emotional wounds.\n\n` +
+      `📚 <b>C. Training & Courses</b> — 7-day and 21-day structured transformation journeys.\n\n` +
+      `📖 <b>D. Resources & E-Books</b> — Essential guides, workbooks, and paid e-books for your walk.`
     );
   }
 
@@ -63,7 +83,7 @@ export class BotService {
       [Markup.button.callback('📖 D. Resources & E-Books', 'srv_resources')],
       [
         Markup.button.callback('👤 My Requests & Profile', 'cmd_status'),
-        Markup.button.callback('🔙 Main Menu', 'cmd_main_menu'),
+        Markup.button.callback('🏠 Home', 'cmd_main_menu'),
       ],
     ]);
   }
@@ -80,7 +100,7 @@ export class BotService {
         Markup.button.callback('🛡️ Purity', 'csl_concern_purity'),
       ],
       [Markup.button.callback('💔 Emotional Concerns', 'csl_concern_emotional')],
-      [Markup.button.callback('🔙 Cancel & Return to Services', 'cmd_services')],
+      [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
     ]);
   }
 
@@ -212,23 +232,23 @@ export class BotService {
 
   getHelpMessage(): string {
     return (
-      `📖 *Available Commands:*\n\n` +
-      `• /services \\- Open the Services menu (Counselling, Inner Healing, Courses, E-books)\n` +
-      `• /register \\- Register as a client\n` +
-      `• /status \\- View your client profile and active requests\n` +
-      `• /cancel \\- Cancel any active request or registration\n` +
-      `• /ping \\- Check server status\n` +
-      `• /help \\- Display this help message\n`
+      `📖 <b>Available Commands:</b>\n\n` +
+      `• /services — Open the Services menu (Counselling, Inner Healing, Courses, E-books)\n` +
+      `• /register — Register as a client\n` +
+      `• /status — View your client profile and active requests\n` +
+      `• /cancel — Cancel any active request or registration\n` +
+      `• /ping — Check server status\n` +
+      `• /help — Display this help message\n`
     );
   }
 
   getAboutMessage(): string {
     return (
-      `🌟 *About Purity Matters*\n\n` +
+      `🌟 <b>About Purity Matters</b>\n\n` +
       `Purity Matters is dedicated to inspiring, educating, and supporting individuals ` +
-      `in living purposeful, pure, and wholesome lives\\.\n\n` +
+      `in living purposeful, pure, and wholesome lives.\n\n` +
       `Through confidential counselling, inner healing ministries, structured journeys, and biblical resources, ` +
-      `we walk alongside you on the journey to total wholeness\\.`
+      `we walk alongside you on the journey to total wholeness.`
     );
   }
 }
