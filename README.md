@@ -34,10 +34,10 @@ src/
 │   └── configuration.ts         # Strongly-typed environment variables loader
 ├── database/
 │   └── entities/
-│       └── user.entity.ts       # Telegram User & Member entity
-└── users/
-    ├── users.module.ts          # User management module
-    └── users.service.ts         # Telegram user upsert & registration logic
+│       └── client.entity.ts     # Telegram Client entity (table: 'client')
+└── clients/
+    ├── clients.module.ts        # Client management module
+    └── clients.service.ts       # Telegram client upsert & registration logic
 ```
 
 ---

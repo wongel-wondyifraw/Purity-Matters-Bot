@@ -7,14 +7,17 @@ import {
   Index,
 } from 'typeorm';
 
-@Entity('users')
-export class User {
+@Entity('client')
+export class Client {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Index({ unique: true })
   @Column({ type: 'bigint' })
   telegramId: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  fullName?: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   username?: string | null;
@@ -34,8 +37,11 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isRegistered: boolean;
 
-  @Column({ type: 'varchar', length: 32, default: 'member' })
+  @Column({ type: 'varchar', length: 32, default: 'client' })
   role: string;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  registrationStep?: string | null;
 
   @Column({ type: 'jsonb', nullable: true, default: {} })
   metadata?: Record<string, any> | null;

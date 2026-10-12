@@ -3,13 +3,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { BotService } from './bot.service.js';
 import { BotUpdate } from './bot.update.js';
-import { UsersModule } from '../users/users.module.js';
+import { ClientsModule } from '../clients/clients.module.js';
 
 const logger = new Logger('TelegrafInit');
 
 @Module({
   imports: [
-    UsersModule,
+    ClientsModule,
     TelegrafModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
