@@ -8,7 +8,7 @@ export interface CounselingDraft {
   concern?: string;
   description?: string | null;
   preferredMethod?: string;
-  preferredTime?: string;
+  preferredTime?: string | null;
 }
 
 @Injectable()
@@ -47,7 +47,7 @@ export class CounselingService {
     if (!client) return null;
 
     const draft = await this.getDraft(telegramId);
-    if (!draft.concern || !draft.preferredMethod || !draft.preferredTime) {
+    if (!draft.concern || !draft.preferredMethod) {
       return null;
     }
 
@@ -59,7 +59,7 @@ export class CounselingService {
       concern: draft.concern,
       description: draft.description && draft.description.trim().length > 0 ? draft.description : 'Not specified',
       preferredMethod: draft.preferredMethod,
-      preferredTime: draft.preferredTime,
+      preferredTime: draft.preferredTime || null,
       status: 'pending',
     });
 
@@ -127,7 +127,7 @@ export class CounselingService {
     concern: string;
     description?: string | null;
     preferredMethod: string;
-    preferredTime: string;
+    preferredTime?: string | null;
     status?: string;
     assignedTo?: string | null;
     scheduledAt?: Date | string | null;
@@ -154,7 +154,7 @@ export class CounselingService {
           ? data.description.trim()
           : 'Not specified',
       preferredMethod: data.preferredMethod.trim(),
-      preferredTime: data.preferredTime.trim(),
+      preferredTime: data.preferredTime?.trim() || null,
       status: data.status?.trim() || 'pending',
       assignedTo: data.assignedTo?.trim() || null,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,

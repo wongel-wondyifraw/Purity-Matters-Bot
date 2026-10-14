@@ -269,7 +269,7 @@ export class BotUpdate {
     await this.clientsService.setRegistrationStep(ctx.from.id, null);
 
     await ctx.replyWithHTML(
-      '📞 <b>Step 3/4: Preferred Method</b>\n\nPlease select your preferred session format:',
+      '📞 <b>Step 3/3: Preferred Method</b>\n\nPlease select your preferred session format:',
       this.botService.getCounselingMethodKeyboard(),
     );
   }
@@ -290,10 +290,15 @@ export class BotUpdate {
     const method = methodLabels[match] ?? match;
     await this.counselingService.updateDraft(ctx.from.id, { preferredMethod: method });
 
+    const draft = await this.counselingService.getDraft(ctx.from.id);
+
     await ctx.replyWithHTML(
-      `Selected Method: <b>${method}</b>\n\n` +
-      '⏰ <b>Step 4/4: Preferred Time</b>\n\nPlease select your preferred appointment window:',
-      this.botService.getCounselingTimeKeyboard(),
+      '📋 <b>Review Your Counselling Request:</b>\n\n' +
+      `• <b>Concern:</b> ${draft.concern}\n` +
+      `• <b>Description:</b> ${draft.description || 'Skipped'}\n` +
+      `• <b>Preferred Method:</b> ${draft.preferredMethod}\n\n` +
+      'Please review and submit your request below:',
+      this.botService.getCounselingConfirmKeyboard(),
     );
   }
 

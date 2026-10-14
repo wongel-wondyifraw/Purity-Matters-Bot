@@ -35,8 +35,8 @@ export class CounselingRequest {
   @Column({ type: 'varchar', length: 64 })
   preferredMethod: string;
 
-  @Column({ type: 'varchar', length: 64 })
-  preferredTime: string;
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  preferredTime?: string | null;
 
   @Column({ type: 'varchar', length: 32, default: 'pending' })
   status: string; // 'pending' | 'assigned' | 'scheduled' | 'completed'

@@ -177,15 +177,15 @@ export class AdminController {
       concern: string;
       description?: string | null;
       preferredMethod: string;
-      preferredTime: string;
+      preferredTime?: string | null;
       status?: string;
       assignedTo?: string | null;
       scheduledAt?: Date | string | null;
     },
   ) {
-    if (!body || !body.clientName || !body.concern || !body.preferredMethod || !body.preferredTime) {
+    if (!body || !body.clientName || !body.concern || !body.preferredMethod) {
       throw new BadRequestException(
-        'Client name, concern, preferred method, and preferred time are required fields.',
+        'Client name, concern, and preferred method are required fields.',
       );
     }
     return this.counselingService.directCreate(body);
