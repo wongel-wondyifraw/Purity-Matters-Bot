@@ -134,6 +134,27 @@ export class ClientsService {
     return this.clientRepository.save(client);
   }
 
+  async findByPhone(phone: string): Promise<Client | null> {
+    if (!phone || !phone.trim()) return null;
+    const clean = phone.trim();
+    const direct = await this.clientRepository.findOne({ where: { phone: clean } });
+    if (direct) return direct;
+
+    const digitsOnly = clean.replace(/\D/g, '');
+    if (digitsOnly.length >= 7) {
+      const allWithPhone = await this.clientRepository.find({
+        select: { id: true, phone: true, fullName: true, telegramId: true },
+      });
+      const match = allWithPhone.find(
+        (c) => c.phone && c.phone.replace(/\D/g, '') === digitsOnly,
+      );
+      if (match) {
+        return this.findById(match.id);
+      }
+    }
+    return null;
+  }
+
   async count(): Promise<number> {
     return this.clientRepository.count();
   }
@@ -151,14 +172,21 @@ export class ClientsService {
       ? String(data.telegramId).trim()
       : String(Date.now());
 
+    const trimmedName = data.fullName.trim();
+    const parts = trimmedName.split(/\s+/);
+    const firstName = parts[0] || null;
+    const lastName = parts.slice(1).join(' ') || null;
+
     const client = this.clientRepository.create({
       telegramId,
-      fullName: data.fullName.trim(),
+      fullName: trimmedName,
+      firstName,
+      lastName,
       username: data.username ? data.username.replace(/^@/, '').trim() : null,
       phone: data.phone ? data.phone.trim() : null,
       languageCode: data.languageCode || 'en',
       role: data.role || 'client',
-      isRegistered: data.isRegistered !== undefined ? data.isRegistered : !!data.phone,
+      isRegistered: data.isRegistered !== undefined ? data.isRegistered : true,
       registrationStep: 'completed',
     });
 

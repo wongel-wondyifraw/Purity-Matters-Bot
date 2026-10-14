@@ -132,6 +132,57 @@ export class CounselingService {
     assignedTo?: string | null;
     scheduledAt?: Date | string | null;
   }): Promise<CounselingRequest> {
+    // 1. Resolve or register the client in the client table first
+    const rawTid =
+      data.telegramId && String(data.telegramId).trim() !== ''
+        ? String(data.telegramId).trim()
+        : null;
+
+    let client = null;
+    if (rawTid) {
+      client = await this.clientsService.findByTelegramId(rawTid);
+    }
+    if (!client && data.phone && data.phone.trim().length > 0) {
+      client = await this.clientsService.findByPhone(data.phone.trim());
+    }
+
+    if (!client) {
+      // Walk-in client not yet registered: generate unique numeric Telegram ID if none provided
+      let assignedTid = rawTid;
+      if (!assignedTid) {
+        let candidate = String(Date.now());
+        while (await this.clientsService.findByTelegramId(candidate)) {
+          candidate = String(Date.now() + Math.floor(Math.random() * 10000));
+        }
+        assignedTid = candidate;
+      }
+
+      client = await this.clientsService.createClient({
+        fullName: data.clientName.trim(),
+        telegramId: assignedTid,
+        phone: data.phone?.trim() || null,
+        role: 'client',
+        isRegistered: true,
+      });
+      this.logger.log(
+        `Registered Walk-in Client #${client.id} ("${client.fullName}") in clients table with Telegram ID ${client.telegramId}`,
+      );
+    } else {
+      let changed = false;
+      if (data.phone && (!client.phone || client.phone === 'Not shared')) {
+        client.phone = data.phone.trim();
+        changed = true;
+      }
+      if (data.clientName && (!client.fullName || client.fullName.startsWith('User #'))) {
+        client.fullName = data.clientName.trim();
+        changed = true;
+      }
+      if (changed) {
+        await this.clientsService.saveClient(client);
+      }
+    }
+
+    // 2. Generate unique reference number
     let ref = this.generateRef();
     let existing = await this.requestRepo.findOne({ where: { referenceNumber: ref } });
     while (existing) {
@@ -139,15 +190,12 @@ export class CounselingService {
       existing = await this.requestRepo.findOne({ where: { referenceNumber: ref } });
     }
 
-    const tid = data.telegramId && String(data.telegramId).trim() !== ''
-      ? String(data.telegramId).trim()
-      : String(Date.now());
-
+    // 3. Create counseling request linked to the registered client
     const request = this.requestRepo.create({
       referenceNumber: ref,
-      telegramId: tid,
-      clientName: data.clientName.trim(),
-      phone: data.phone?.trim() || null,
+      telegramId: String(client.telegramId),
+      clientName: client.fullName || data.clientName.trim(),
+      phone: client.phone || data.phone?.trim() || null,
       concern: data.concern.trim(),
       description:
         data.description && data.description.trim().length > 0
@@ -161,7 +209,9 @@ export class CounselingService {
     });
 
     const saved = await this.requestRepo.save(request);
-    this.logger.log(`Created Direct Counseling Request ${saved.referenceNumber} for client "${saved.clientName}"`);
+    this.logger.log(
+      `Created Direct Counseling Request ${saved.referenceNumber} for client "${saved.clientName}" (client #${client.id}, TG: ${client.telegramId})`,
+    );
     return saved;
   }
 
