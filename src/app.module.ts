@@ -10,6 +10,7 @@ import { ResourcePurchase } from './database/entities/resource-purchase.entity.j
 import { Resource } from './database/entities/resource.entity.js';
 import { PhysicalBookOrder } from './database/entities/physical-book-order.entity.js';
 import { User } from './database/entities/user.entity.js';
+import { AnonymousQuestion } from './database/entities/anonymous-question.entity.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { FeaturesModule } from './features/features.module.js';
 import { BotModule } from './bot/bot.module.js';
@@ -43,6 +44,7 @@ import { AppService } from './app.service.js';
           Resource,
           PhysicalBookOrder,
           User,
+          AnonymousQuestion,
         ],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),

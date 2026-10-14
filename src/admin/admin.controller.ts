@@ -22,6 +22,7 @@ import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
+import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
 
@@ -33,6 +34,7 @@ export class AdminController {
     private readonly innerHealingService: InnerHealingService,
     private readonly coursesService: CoursesService,
     private readonly resourcesService: ResourcesService,
+    private readonly questionsService: AnonymousQuestionsService,
   ) {}
 
   @Get('stats')
@@ -428,5 +430,35 @@ export class AdminController {
         phone: client?.phone || 'N/A',
       };
     });
+  }
+
+  @Get('questions')
+  async getQuestions() {
+    return this.questionsService.getAll();
+  }
+
+  @Patch('questions/:id/answer')
+  async answerQuestion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    body: {
+      answer: string;
+      assignedCounselor?: string | null;
+      isPublic?: boolean;
+    },
+  ) {
+    if (!body || !body.answer || !body.answer.trim()) {
+      throw new BadRequestException('Answer text is required.');
+    }
+    return this.questionsService.answerQuestion(id, body);
+  }
+
+  @Delete('questions/:id')
+  async deleteQuestion(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.questionsService.deleteQuestion(id);
+    if (!success) {
+      throw new NotFoundException(`Question #${id} not found.`);
+    }
+    return { success: true, message: `Question #${id} deleted successfully.` };
   }
 }

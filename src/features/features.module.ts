@@ -6,11 +6,14 @@ import { CourseProgress } from '../database/entities/course-progress.entity.js';
 import { ResourcePurchase } from '../database/entities/resource-purchase.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
 import { PhysicalBookOrder } from '../database/entities/physical-book-order.entity.js';
+import { AnonymousQuestion } from '../database/entities/anonymous-question.entity.js';
 import { ClientsModule } from '../clients/clients.module.js';
 import { CounselingService } from './counseling.service.js';
 import { InnerHealingService } from './inner-healing.service.js';
 import { CoursesService } from './courses.service.js';
 import { ResourcesService } from './resources.service.js';
+import { AnonymousQuestionsService } from './anonymous-questions.service.js';
+import { QuestionsController } from './questions.controller.js';
 
 @Module({
   imports: [
@@ -22,19 +25,23 @@ import { ResourcesService } from './resources.service.js';
       ResourcePurchase,
       Resource,
       PhysicalBookOrder,
+      AnonymousQuestion,
     ]),
   ],
+  controllers: [QuestionsController],
   providers: [
     CounselingService,
     InnerHealingService,
     CoursesService,
     ResourcesService,
+    AnonymousQuestionsService,
   ],
   exports: [
     CounselingService,
     InnerHealingService,
     CoursesService,
     ResourcesService,
+    AnonymousQuestionsService,
   ],
 })
 export class FeaturesModule {}
