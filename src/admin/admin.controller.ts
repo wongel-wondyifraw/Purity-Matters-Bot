@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -166,12 +167,58 @@ export class AdminController {
     return this.counselingService.findAll();
   }
 
+  @Post('counseling')
+  async createCounseling(
+    @Body()
+    body: {
+      clientName: string;
+      phone?: string | null;
+      telegramId?: string | number | null;
+      concern: string;
+      description?: string | null;
+      preferredMethod: string;
+      preferredTime: string;
+      status?: string;
+      assignedTo?: string | null;
+      scheduledAt?: Date | string | null;
+    },
+  ) {
+    if (!body || !body.clientName || !body.concern || !body.preferredMethod || !body.preferredTime) {
+      throw new BadRequestException(
+        'Client name, concern, preferred method, and preferred time are required fields.',
+      );
+    }
+    return this.counselingService.directCreate(body);
+  }
+
   @Patch('counseling/:id')
   async updateCounseling(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: string; assignedTo?: string },
+    @Body()
+    body: {
+      status?: string;
+      assignedTo?: string | null;
+      concern?: string;
+      description?: string | null;
+      preferredMethod?: string;
+      preferredTime?: string;
+      scheduledAt?: Date | string | null;
+    },
   ) {
-    return this.counselingService.updateStatus(id, body.status, body.assignedTo);
+    const updated = await this.counselingService.updateRequest(id, body);
+    if (!updated) {
+      throw new NotFoundException(`Counseling request #${id} not found.`);
+    }
+    return updated;
+  }
+
+  @Delete('counseling/:id')
+  async deleteCounseling(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.counselingService.deleteRequest(id);
+    if (!success) {
+      throw new NotFoundException(`Counseling request #${id} not found.`);
+    }
+    return { success: true, message: `Counseling request #${id} deleted successfully.` };
   }
 
   @Get('inner-healing')

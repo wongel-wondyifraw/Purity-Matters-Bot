@@ -89,12 +89,87 @@ export class CounselingService {
   }
 
   async updateStatus(id: number, status: string, assignedTo?: string): Promise<CounselingRequest | null> {
+    return this.updateRequest(id, { status, assignedTo });
+  }
+
+  async updateRequest(
+    id: number,
+    data: {
+      status?: string;
+      assignedTo?: string | null;
+      concern?: string;
+      description?: string | null;
+      preferredMethod?: string;
+      preferredTime?: string;
+      scheduledAt?: Date | string | null;
+    },
+  ): Promise<CounselingRequest | null> {
     const req = await this.requestRepo.findOne({ where: { id } });
     if (!req) return null;
-    req.status = status;
-    if (assignedTo !== undefined) {
-      req.assignedTo = assignedTo;
+
+    if (data.status !== undefined) req.status = data.status;
+    if (data.assignedTo !== undefined) req.assignedTo = data.assignedTo?.trim() || null;
+    if (data.concern !== undefined) req.concern = data.concern;
+    if (data.description !== undefined) req.description = data.description;
+    if (data.preferredMethod !== undefined) req.preferredMethod = data.preferredMethod;
+    if (data.preferredTime !== undefined) req.preferredTime = data.preferredTime;
+    if (data.scheduledAt !== undefined) {
+      req.scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : null;
     }
+
     return this.requestRepo.save(req);
+  }
+
+  async directCreate(data: {
+    clientName: string;
+    phone?: string | null;
+    telegramId?: string | number | null;
+    concern: string;
+    description?: string | null;
+    preferredMethod: string;
+    preferredTime: string;
+    status?: string;
+    assignedTo?: string | null;
+    scheduledAt?: Date | string | null;
+  }): Promise<CounselingRequest> {
+    let ref = this.generateRef();
+    let existing = await this.requestRepo.findOne({ where: { referenceNumber: ref } });
+    while (existing) {
+      ref = this.generateRef();
+      existing = await this.requestRepo.findOne({ where: { referenceNumber: ref } });
+    }
+
+    const tid = data.telegramId && String(data.telegramId).trim() !== ''
+      ? String(data.telegramId).trim()
+      : String(Date.now());
+
+    const request = this.requestRepo.create({
+      referenceNumber: ref,
+      telegramId: tid,
+      clientName: data.clientName.trim(),
+      phone: data.phone?.trim() || null,
+      concern: data.concern.trim(),
+      description:
+        data.description && data.description.trim().length > 0
+          ? data.description.trim()
+          : 'Not specified',
+      preferredMethod: data.preferredMethod.trim(),
+      preferredTime: data.preferredTime.trim(),
+      status: data.status?.trim() || 'pending',
+      assignedTo: data.assignedTo?.trim() || null,
+      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+    });
+
+    const saved = await this.requestRepo.save(request);
+    this.logger.log(`Created Direct Counseling Request ${saved.referenceNumber} for client "${saved.clientName}"`);
+    return saved;
+  }
+
+  async deleteRequest(id: number): Promise<boolean> {
+    const req = await this.requestRepo.findOne({ where: { id } });
+    if (!req) return false;
+    await this.requestRepo.remove(req);
+    this.logger.log(`Deleted Counseling Request #${id} (${req.referenceNumber})`);
+    return true;
   }
 }
