@@ -1,9 +1,28 @@
-import { Controller, Get, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Delete,
+  Param,
+  Body,
+  Query,
+  ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  NotFoundException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import { ClientsService } from '../clients/clients.service.js';
 import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
+import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
+import { Resource } from '../database/entities/resource.entity.js';
 
 @Controller('api/admin')
 export class AdminController {
@@ -95,17 +114,51 @@ export class AdminController {
     });
   }
 
+  @Post('clients')
+  async createClient(
+    @Body()
+    body: {
+      fullName: string;
+      telegramId?: string | number | null;
+      username?: string | null;
+      phone?: string | null;
+      languageCode?: string | null;
+      role?: string;
+      isRegistered?: boolean;
+    },
+  ) {
+    return this.clientsService.createClient(body);
+  }
+
   @Patch('clients/:id')
   async updateClient(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { role?: string; phone?: string; fullName?: string },
+    @Body()
+    body: {
+      role?: string;
+      phone?: string;
+      fullName?: string;
+      username?: string;
+      languageCode?: string;
+      isRegistered?: boolean;
+    },
   ) {
     const client = await this.clientsService.findById(id);
     if (!client) return null;
     if (body.role !== undefined) client.role = body.role;
     if (body.phone !== undefined) client.phone = body.phone;
     if (body.fullName !== undefined) client.fullName = body.fullName;
+    if (body.username !== undefined)
+      client.username = body.username ? body.username.replace(/^@/, '').trim() : null;
+    if (body.languageCode !== undefined) client.languageCode = body.languageCode;
+    if (body.isRegistered !== undefined) client.isRegistered = body.isRegistered;
     return this.clientsService.saveClient(client);
+  }
+
+  @Delete('clients/:id')
+  async deleteClient(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.clientsService.deleteClient(id);
+    return { success };
   }
 
   @Get('counseling')
@@ -151,8 +204,169 @@ export class AdminController {
     });
   }
 
+  // ==========================================
+  // RESOURCE CATALOG (E-Books & Physical Books)
+  // ==========================================
+
+  @Get('resources/catalog')
+  async getResourcesCatalog(@Query() query: any) {
+    return this.resourcesService.findAllResources(query);
+  }
+
+  @Post('resources')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/resources/ebooks');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    }),
+  )
+  async createResource(
+    @Body() body: any,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const data: Partial<Resource> = {
+      title: body.title,
+      author: body.author || null,
+      description: body.description || null,
+      type: body.type || 'ebook',
+      pricingType:
+        body.pricingType || (Number(body.price) > 0 ? 'paid' : 'free'),
+      price: Number(body.price) || 0,
+      currency: body.currency || 'ETB',
+      stockQuantity:
+        body.type === 'physical_book' ? Number(body.stockQuantity) || 0 : null,
+      coverImageUrl: body.coverImageUrl || null,
+    };
+
+    if (file) {
+      data.filePath = `/uploads/resources/ebooks/${file.filename}`;
+      data.fileName = file.originalname;
+      data.fileSizeBytes = file.size;
+      data.fileMimeType = file.mimetype;
+    }
+
+    return this.resourcesService.createResource(data);
+  }
+
+  @Patch('resources/:id')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/resources/ebooks');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    }),
+  )
+  async updateResource(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const data: Partial<Resource> = {};
+    if (body.title !== undefined) data.title = body.title;
+    if (body.author !== undefined) data.author = body.author;
+    if (body.description !== undefined) data.description = body.description;
+    if (body.type !== undefined) data.type = body.type;
+    if (body.pricingType !== undefined) data.pricingType = body.pricingType;
+    if (body.price !== undefined) data.price = Number(body.price) || 0;
+    if (body.currency !== undefined) data.currency = body.currency;
+    if (body.stockQuantity !== undefined) {
+      data.stockQuantity =
+        body.type === 'ebook'
+          ? null
+          : Number(body.stockQuantity) || 0;
+    }
+    if (body.coverImageUrl !== undefined) data.coverImageUrl = body.coverImageUrl;
+
+    if (file) {
+      data.filePath = `/uploads/resources/ebooks/${file.filename}`;
+      data.fileName = file.originalname;
+      data.fileSizeBytes = file.size;
+      data.fileMimeType = file.mimetype;
+    }
+
+    const updated = await this.resourcesService.updateResource(id, data);
+    if (!updated) {
+      throw new NotFoundException(`Resource with ID ${id} not found`);
+    }
+    return updated;
+  }
+
+  @Delete('resources/:id')
+  async deleteResource(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.resourcesService.deleteResource(id);
+    if (!success) {
+      throw new NotFoundException(`Resource with ID ${id} not found`);
+    }
+    return { success: true, message: `Resource #${id} permanently deleted` };
+  }
+
+  // ==========================================
+  // PHYSICAL BOOK ORDERS (Delivery & Courier Queue)
+  // ==========================================
+
+  @Get('resources/orders')
+  async getPhysicalOrders(@Query() query: any) {
+    return this.resourcesService.findAllPhysicalOrders(query);
+  }
+
+  @Post('resources/orders')
+  async createPhysicalOrder(@Body() body: any) {
+    return this.resourcesService.createPhysicalOrder(body);
+  }
+
+  @Patch('resources/orders/:id/status')
+  async updatePhysicalOrderStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: PhysicalOrderStatus; dispatchNotes?: string },
+  ) {
+    return this.resourcesService.updatePhysicalOrderStatus(
+      id,
+      body.status,
+      body.dispatchNotes,
+    );
+  }
+
+  // Legacy/compatibility endpoint for existing calls
   @Get('resources')
   async getResources() {
+    const physicalOrders = await this.resourcesService.findAllPhysicalOrders();
+    if (physicalOrders.length > 0) {
+      return physicalOrders.map((o) => ({
+        id: o.id,
+        telegramId: String(o.telegramId),
+        clientName: o.clientName,
+        phone: o.phone,
+        resourceTitle: o.resourceTitle,
+        amount: Number(o.totalAmount),
+        currency: o.currency,
+        status: o.status,
+        date: new Date(o.createdAt).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+      }));
+    }
+
     const [purchases, clients] = await Promise.all([
       this.resourcesService.getAllPurchases(),
       this.clientsService.findAll(),
@@ -162,7 +376,8 @@ export class AdminController {
       const client = clientMap.get(String(item.telegramId));
       return {
         ...item,
-        clientName: client?.fullName || client?.firstName || `User #${item.telegramId}`,
+        clientName:
+          client?.fullName || client?.firstName || `User #${item.telegramId}`,
         phone: client?.phone || 'N/A',
       };
     });

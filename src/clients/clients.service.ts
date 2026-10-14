@@ -137,4 +137,36 @@ export class ClientsService {
   async count(): Promise<number> {
     return this.clientRepository.count();
   }
+
+  async createClient(data: {
+    fullName: string;
+    telegramId?: string | number | null;
+    username?: string | null;
+    phone?: string | null;
+    languageCode?: string | null;
+    role?: string;
+    isRegistered?: boolean;
+  }): Promise<Client> {
+    const telegramId = data.telegramId && String(data.telegramId).trim().length > 0
+      ? String(data.telegramId).trim()
+      : String(Date.now());
+
+    const client = this.clientRepository.create({
+      telegramId,
+      fullName: data.fullName.trim(),
+      username: data.username ? data.username.replace(/^@/, '').trim() : null,
+      phone: data.phone ? data.phone.trim() : null,
+      languageCode: data.languageCode || 'en',
+      role: data.role || 'client',
+      isRegistered: data.isRegistered !== undefined ? data.isRegistered : !!data.phone,
+      registrationStep: 'completed',
+    });
+
+    return this.clientRepository.save(client);
+  }
+
+  async deleteClient(id: number): Promise<boolean> {
+    const res = await this.clientRepository.delete(id);
+    return (res.affected ?? 0) > 0;
+  }
 }

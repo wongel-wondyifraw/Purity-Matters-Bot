@@ -7,10 +7,14 @@ import { CounselingRequest } from './database/entities/counseling-request.entity
 import { InnerHealingRequest } from './database/entities/inner-healing-request.entity.js';
 import { CourseProgress } from './database/entities/course-progress.entity.js';
 import { ResourcePurchase } from './database/entities/resource-purchase.entity.js';
+import { Resource } from './database/entities/resource.entity.js';
+import { PhysicalBookOrder } from './database/entities/physical-book-order.entity.js';
+import { User } from './database/entities/user.entity.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { FeaturesModule } from './features/features.module.js';
 import { BotModule } from './bot/bot.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -36,6 +40,9 @@ import { AppService } from './app.service.js';
           InnerHealingRequest,
           CourseProgress,
           ResourcePurchase,
+          Resource,
+          PhysicalBookOrder,
+          User,
         ],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),
@@ -46,6 +53,7 @@ import { AppService } from './app.service.js';
     FeaturesModule,
     BotModule,
     AdminModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

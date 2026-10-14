@@ -18,4 +18,16 @@ export default () => ({
     logging: process.env.DB_LOGGING === 'true',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   },
+  jwt: {
+    secret: process.env.JWT_SECRET ?? 'purity-matters-console-jwt-secret-key-2026',
+    expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+  },
+  defaultAdmin: {
+    email: process.env.DEFAULT_ADMIN_EMAIL ?? 'admin@puritymatters.org',
+    password: process.env.DEFAULT_ADMIN_PASSWORD ?? 'Admin@12345',
+    firstName: process.env.DEFAULT_ADMIN_FIRST_NAME ?? 'Bereket',
+    middleName: process.env.DEFAULT_ADMIN_MIDDLE_NAME ?? 'Tadesse',
+    lastName: process.env.DEFAULT_ADMIN_LAST_NAME ?? 'Alemu',
+    role: process.env.DEFAULT_ADMIN_ROLE ?? 'superadmin',
+  },
 });

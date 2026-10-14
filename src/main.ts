@@ -1,17 +1,29 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { getBotToken } from 'nestjs-telegraf';
+import * as path from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors({
     origin: true,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type,Accept,Authorization',
+  });
+
+  // Ensure uploads directory exists
+  const uploadsDir = path.resolve(process.cwd(), 'uploads/resources/ebooks');
+  fs.mkdirSync(uploadsDir, { recursive: true });
+
+  // Serve uploaded files statically at /uploads/*
+  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
   });
   const configService = app.get(ConfigService);
 
