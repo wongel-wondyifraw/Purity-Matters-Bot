@@ -10,11 +10,33 @@ import { AppModule } from './app.module.js';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const rawAllowedOrigins = [
+    'https://anonymous.puritymattersethiopia.com',
+    'https://app.puritymatters.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()) : []),
+  ];
+  const allowedOrigins = new Set(rawAllowedOrigins.map((o) => o.replace(/\/+$/, '')));
+
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow non-browser requests (e.g. Telegram webhooks, mobile apps, curl)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      if (allowedOrigins.has(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      logger.warn(`Blocked by CORS: ${origin}`);
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Accept,Authorization',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
   });
 
   // Ensure uploads directory exists
