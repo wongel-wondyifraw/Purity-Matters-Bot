@@ -10,11 +10,20 @@ import { AppModule } from './app.module.js';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
   const rawAllowedOrigins = [
     'https://anonymous.puritymattersethiopia.com',
+    'https://console.puritymattersethiopia.com',
+    'https://admin.puritymattersethiopia.com',
+    'https://portal.puritymattersethiopia.com',
+    'https://puritymattersethiopia.com',
+    'https://www.puritymattersethiopia.com',
     'https://app.puritymatters.com',
+    'https://puritymatters.com',
+    'https://www.puritymatters.com',
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://localhost:3002',
     ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()) : []),
   ];
   const allowedOrigins = new Set(rawAllowedOrigins.map((o) => o.replace(/\/+$/, '')));
@@ -27,16 +36,26 @@ async function bootstrap() {
       }
 
       const normalizedOrigin = origin.replace(/\/+$/, '');
-      if (allowedOrigins.has(normalizedOrigin)) {
+
+      // Check explicit allowlist or regex matches for any domain/subdomain
+      const isAllowed =
+        allowedOrigins.has(normalizedOrigin) ||
+        /^https?:\/\/([a-zA-Z0-9-]+\.)*puritymattersethiopia\.com(:\d+)?$/i.test(normalizedOrigin) ||
+        /^https?:\/\/([a-zA-Z0-9-]+\.)*puritymatters\.com(:\d+)?$/i.test(normalizedOrigin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalizedOrigin);
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
       logger.warn(`Blocked by CORS: ${origin}`);
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      return callback(null, false);
     },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
+    allowedHeaders:
+      'Content-Type,Accept,Authorization,X-Requested-With,Origin,Access-Control-Request-Method,Access-Control-Request-Headers',
+    optionsSuccessStatus: 204,
   });
 
   // Ensure uploads directory exists
