@@ -30,19 +30,21 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (e.g. Telegram webhooks, mobile apps, curl)
+      // Allow non-browser requests (e.g. Telegram webhooks, mobile apps, curl, server-to-server)
       if (!origin) {
         return callback(null, true);
       }
 
       const normalizedOrigin = origin.replace(/\/+$/, '');
 
-      // Check explicit allowlist or regex matches for any domain/subdomain
+      // Check explicit allowlist or regex matches for any domain/subdomain/local environment
       const isAllowed =
         allowedOrigins.has(normalizedOrigin) ||
         /^https?:\/\/([a-zA-Z0-9-]+\.)*puritymattersethiopia\.com(:\d+)?$/i.test(normalizedOrigin) ||
         /^https?:\/\/([a-zA-Z0-9-]+\.)*puritymatters\.com(:\d+)?$/i.test(normalizedOrigin) ||
-        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalizedOrigin);
+        /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(normalizedOrigin) ||
+        /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/i.test(normalizedOrigin) ||
+        /^https?:\/\/([a-zA-Z0-9-]+\.)*vercel\.app$/i.test(normalizedOrigin);
 
       if (isAllowed) {
         return callback(null, true);
@@ -52,9 +54,9 @@ async function bootstrap() {
       return callback(null, false);
     },
     credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders:
-      'Content-Type,Accept,Authorization,X-Requested-With,Origin,Access-Control-Request-Method,Access-Control-Request-Headers',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    // Omitting allowedHeaders allows cors to dynamically echo back Access-Control-Request-Headers,
+    // preventing browser preflight rejection due to headers like Cache-Control, RSC, or client hints.
     optionsSuccessStatus: 204,
   });
 
