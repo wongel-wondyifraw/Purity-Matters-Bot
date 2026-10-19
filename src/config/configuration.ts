@@ -1,5 +1,7 @@
 export default () => ({
-  port: parseInt(process.env.PORT ?? '3000', 10),
+  port: process.env.PORT && !isNaN(Number(process.env.PORT))
+    ? parseInt(process.env.PORT, 10)
+    : process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   telegram: {
     token: process.env.BOT_TOKEN ?? '',

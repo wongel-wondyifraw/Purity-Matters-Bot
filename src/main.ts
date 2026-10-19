@@ -88,8 +88,8 @@ async function bootstrap() {
     }
   }
 
-  const port = configService.get<number>('port', 3000);
+  const port = configService.get<number | string>('port', 3000);
   await app.listen(port);
-  logger.log(`Server listening on port ${port} (Bot mode: ${mode})`);
+  logger.log(`Server listening on ${typeof port === 'number' ? `port ${port}` : port} (Bot mode: ${mode})`);
 }
 await bootstrap();
