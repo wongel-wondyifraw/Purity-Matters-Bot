@@ -13,6 +13,7 @@ async function bootstrap() {
 
   const rawAllowedOrigins = [
     'https://anonymous.puritymattersethiopia.com',
+    'https://app.puritymattersethiopia.com',
     'https://console.puritymattersethiopia.com',
     'https://admin.puritymattersethiopia.com',
     'https://portal.puritymattersethiopia.com',
