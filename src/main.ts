@@ -72,25 +72,91 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const mode = configService.get<string>('telegram.mode', 'polling');
-  const token = configService.get<string>('telegram.token');
-  const webhookDomain = configService.get<string>('telegram.webhookDomain');
-  const webhookPath = configService.get<string>('telegram.webhookPath', '/api/telegram/webhook');
-  const webhookSecret = configService.get<string>('telegram.webhookSecret');
+  const token = configService.get<string>('telegram.token', '');
+  const webhookDomain = configService.get<string>(
+    'telegram.webhookDomain',
+    '',
+  );
+  const webhookPath = configService.get<string>(
+    'telegram.webhookPath',
+    '/api/telegram/webhook',
+  );
+  const webhookSecret = configService.get<string>(
+    'telegram.webhookSecret',
+    '',
+  );
 
-  const hasValidToken = !!token && token.trim().length > 0 && token !== 'your_telegram_bot_token_here';
+  const hasValidToken =
+    token.trim().length > 0 &&
+    token !== 'your_telegram_bot_token_here';
+
+  let webhookEnabled = false;
 
   if (mode === 'webhook' && hasValidToken && webhookDomain) {
     try {
       const bot = app.get(getBotToken());
-      app.use(bot.webhookCallback(webhookPath, webhookSecret ? { secretToken: webhookSecret } : undefined));
-      logger.log(`Telegram webhook endpoint mounted at: ${webhookPath}`);
+
+      app.use(
+        webhookPath,
+        bot.webhookCallback(
+          webhookPath,
+          webhookSecret
+            ? { secretToken: webhookSecret }
+            : undefined,
+        ),
+      );
+
+      webhookEnabled = true;
+      logger.log(`Telegram webhook handler mounted at ${webhookPath}`);
     } catch (error) {
-      logger.error('Failed to attach Telegram webhook handler', error);
+      logger.error(
+        'Failed to attach Telegram webhook handler',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
   const port = configService.get<number | string>('port', 3000);
   await app.listen(port);
-  logger.log(`Server listening on ${typeof port === 'number' ? `port ${port}` : port} (Bot mode: ${mode})`);
+
+  logger.log(
+    `Server listening on ${typeof port === 'number' ? `port ${port}` : port} (Bot mode: ${mode})`,
+  );
+
+  // Register the Telegram webhook after NestJS starts listening.
+  // NestJS/Passenger owns the HTTP server; Telegraf does not launch another one.
+  if (mode === 'webhook' && hasValidToken && webhookDomain && webhookEnabled) {
+    const normalizedDomain = webhookDomain.replace(/\/+$/, '');
+    const normalizedPath = webhookPath.startsWith('/')
+      ? webhookPath
+      : `/${webhookPath}`;
+    const webhookUrl = `${normalizedDomain}${normalizedPath}`;
+
+    try {
+      const bot = app.get(getBotToken());
+
+      const registered = await bot.telegram.setWebhook(
+        webhookUrl,
+        webhookSecret
+          ? { secret_token: webhookSecret }
+          : {},
+      );
+
+      if (registered) {
+        logger.log(`Telegram webhook registered: ${webhookUrl}`);
+      } else {
+        logger.error('Telegram webhook registration returned false.');
+      }
+    } catch (error) {
+      logger.error(
+        'Telegram webhook registration failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
 }
-await bootstrap();
+
+bootstrap().catch((error) => {
+  console.error('Fatal application bootstrap error:', error);
+  process.exit(1);
+});

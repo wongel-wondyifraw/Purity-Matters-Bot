@@ -18,14 +18,24 @@ const logger = new Logger('TelegrafInit');
       useFactory: (configService: ConfigService) => {
         const token = configService.get<string>('telegram.token') || '';
         const mode = configService.get<string>('telegram.mode', 'polling');
-        const webhookDomain = configService.get<string>('telegram.webhookDomain', '');
-        const webhookPath = configService.get<string>('telegram.webhookPath', '/api/telegram/webhook');
-        const webhookSecret = configService.get<string>('telegram.webhookSecret', '');
+        const webhookDomain = configService.get<string>(
+          'telegram.webhookDomain',
+          '',
+        );
+        const webhookPath = configService.get<string>(
+          'telegram.webhookPath',
+          '/api/telegram/webhook',
+        );
 
-        const hasValidToken = token.trim().length > 0 && token !== 'your_telegram_bot_token_here';
+        const hasValidToken =
+          token.trim().length > 0 &&
+          token !== 'your_telegram_bot_token_here';
 
         if (!hasValidToken) {
-          logger.warn('⚠️  BOT_TOKEN is not configured in .env. Bot update processing is disabled until a valid token is provided.');
+          logger.warn(
+            'BOT_TOKEN is not configured. Telegram bot startup is disabled.',
+          );
+
           return {
             token: '0000000000:dummy_token',
             launchOptions: false,
@@ -34,30 +44,28 @@ const logger = new Logger('TelegrafInit');
 
         if (mode === 'webhook') {
           if (!webhookDomain) {
-            logger.warn('⚠️  BOT_MODE is set to "webhook" but WEBHOOK_DOMAIN is not specified in .env. Update listening is paused.');
-            return {
-              token,
-              launchOptions: false,
-            };
+            logger.warn(
+              'BOT_MODE is webhook but WEBHOOK_DOMAIN is not configured.',
+            );
           }
 
-          logger.log(`🌐 Configuring Telegram Bot in WEBHOOK mode with domain: ${webhookDomain}${webhookPath}`);
+          logger.log(
+            `Configuring Telegram Bot in WEBHOOK mode: ${webhookDomain}${webhookPath}`,
+          );
+
+          // NestJS and Passenger own the HTTP server.
+          // Telegram webhook registration is handled separately in main.ts.
           return {
             token,
-            launchOptions: {
-              webhook: {
-                domain: webhookDomain,
-                path: webhookPath,
-                ...(webhookSecret ? { secretToken: webhookSecret } : {}),
-              },
-            },
+            launchOptions: false,
           };
         }
 
-        logger.log('🔄 Configuring Telegram Bot in POLLING mode');
+        logger.log('Configuring Telegram Bot in POLLING mode');
+
         return {
           token,
-          launchOptions: undefined, // Default long-polling
+          launchOptions: undefined,
         };
       },
     }),
