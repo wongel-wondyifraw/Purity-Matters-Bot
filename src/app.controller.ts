@@ -14,4 +14,9 @@ export class AppController {
   getHealth() {
     return this.appService.getStatus();
   }
+
+  @Get('api/telegram/status')
+  getTelegramStatus() {
+    return this.appService.getTelegramStatus();
+  }
 }

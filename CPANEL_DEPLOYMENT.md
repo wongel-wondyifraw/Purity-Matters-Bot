@@ -107,24 +107,49 @@ DB_SSL=false
    {
      "status": "ok",
      "service": "Purity Matters Bot Backend",
+     "mode": "webhook",
      "timestamp": "..."
    }
    ```
-3. **Verify Telegram Webhook Status:**
+3. **Verify Webhook Diagnostics Endpoint:**
+   Visit in your browser:
+   ```
+   https://bot.yourdomain.com/api/telegram/status
+   ```
+   This endpoint directly checks Telegram's Bot API and returns the real-time webhook status:
+   ```json
+   {
+     "status": "ok",
+     "botConfigured": true,
+     "mode": "webhook",
+     "webhookDomain": "https://bot.yourdomain.com",
+     "webhookPath": "/api/telegram/webhook",
+     "webhookSecretConfigured": true,
+     "telegramWebhookInfo": {
+       "url": "https://bot.yourdomain.com/api/telegram/webhook",
+       "has_custom_certificate": false,
+       "pending_update_count": 0,
+       "last_error_date": 0,
+       "last_error_message": null
+     }
+   }
+   ```
+4. **Verify Direct Telegram Webhook Info:**
    Visit in your browser:
    ```
    https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo
    ```
-   You should see:
-   ```json
-   {
-     "ok": true,
-     "result": {
-       "url": "https://bot.yourdomain.com/api/telegram/webhook",
-       "has_custom_certificate": false,
-       "pending_update_count": 0
-     }
-   }
-   ```
-4. **Test in Telegram:**
-   Open your bot in Telegram and send `/start`. You should receive the welcome message and inline keyboard buttons immediately!
+5. **Test in Telegram:**
+   Open your bot in Telegram and send `/start`. You should receive the welcome message and interactive keyboard buttons immediately!
+
+---
+
+## 🔍 Troubleshooting cPanel Webhook Issues
+
+| Issue | Cause | Fix |
+|---|---|---|
+| **Telegram `getWebhookInfo` says: `Wrong response from webhook: 404`** | Webhook URL path mismatch or route prefix stripped | Check `/api/telegram/status`. Verify `WEBHOOK_DOMAIN` matches your exact HTTPS URL without trailing slashes. |
+| **Telegram `getWebhookInfo` says: `SSL error: ...`** | Missing or expired SSL certificate | Telegram **strictly requires** valid HTTPS. In cPanel, go to **SSL/TLS Status** and click **Run AutoSSL** to issue a free SSL certificate. |
+| **Status endpoint says `botConfigured: false`** | `.env` file not found or `BOT_TOKEN` missing | Ensure `.env` is located in the application root directory (where `app.js` is) and `BOT_TOKEN` is set with your actual token from `@BotFather`. |
+| **cPanel shows 503 / 500 error** | Database connection failed or crash on startup | In cPanel PostgreSQL, verify your DB user has permissions to the database. Check `stderr.log` inside your app root directory or cPanel Node.js App logs. |
+| **Bot not responding to commands** | Secret token mismatch | If `WEBHOOK_SECRET` is set in `.env`, verify it has no extra quotes or spaces. You can leave `WEBHOOK_SECRET` blank during initial testing. |

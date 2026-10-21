@@ -2,13 +2,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
+import { ConfigService } from '@nestjs/config';
+
 describe('AppController', () => {
   let appController: AppController;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        AppService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (_key: string, defaultValue?: any) => defaultValue ?? '',
+          },
+        },
+      ],
     }).compile();
 
     appController = app.get<AppController>(AppController);

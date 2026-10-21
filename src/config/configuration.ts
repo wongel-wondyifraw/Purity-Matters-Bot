@@ -4,18 +4,18 @@ export default () => ({
     : process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   telegram: {
-    token: process.env.BOT_TOKEN ?? '',
-    mode: (process.env.BOT_MODE ?? 'polling').toLowerCase(), // 'polling' | 'webhook'
-    webhookDomain: process.env.WEBHOOK_DOMAIN ?? '',
-    webhookPath: process.env.WEBHOOK_PATH ?? '/api/telegram/webhook',
-    webhookSecret: process.env.WEBHOOK_SECRET ?? '',
+    token: (process.env.BOT_TOKEN ?? '').trim(),
+    mode: (process.env.BOT_MODE ?? 'polling').trim().toLowerCase(), // 'polling' | 'webhook'
+    webhookDomain: (process.env.WEBHOOK_DOMAIN ?? '').trim(),
+    webhookPath: (process.env.WEBHOOK_PATH ?? '/api/telegram/webhook').trim(),
+    webhookSecret: (process.env.WEBHOOK_SECRET ?? '').trim(),
   },
   database: {
-    host: process.env.DB_HOST ?? 'localhost',
+    host: (process.env.DB_HOST ?? 'localhost').trim(),
     port: parseInt(process.env.DB_PORT ?? '5432', 10),
-    username: process.env.DB_USERNAME ?? 'postgres',
+    username: (process.env.DB_USERNAME ?? 'postgres').trim(),
     password: process.env.DB_PASSWORD ?? 'postgres',
-    database: process.env.DB_NAME ?? 'purity_matters_db',
+    database: (process.env.DB_NAME ?? 'purity_matters_db').trim(),
     synchronize: process.env.DB_SYNCHRONIZE === 'true' || process.env.NODE_ENV !== 'production',
     logging: process.env.DB_LOGGING === 'true',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
