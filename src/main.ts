@@ -5,7 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { getBotToken } from 'nestjs-telegraf';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { Request, Response, NextFunction } from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import * as dotenv from 'dotenv';
 import { AppModule } from './app.module.js';
 
@@ -18,6 +18,10 @@ async function bootstrap() {
 
   // Trust reverse proxy (cPanel / Phusion Passenger / Apache / LiteSpeed / Nginx)
   app.set('trust proxy', 1);
+
+  // Ensure JSON body parsing is active before route and middleware execution
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   const rawAllowedOrigins = [
     'https://anonymous.puritymattersethiopia.com',
@@ -118,11 +122,43 @@ async function bootstrap() {
           }
 
           try {
-            let update = req.body;
-            if (typeof update === 'string') {
-              update = JSON.parse(update);
+            let update: any = req.body;
+
+            // 1. If req.body is a Buffer, convert to string
+            if (Buffer.isBuffer(update)) {
+              update = update.toString('utf-8');
             }
-            await bot.handleUpdate(update, res);
+
+            // 2. If update is a string, parse as JSON
+            if (typeof update === 'string') {
+              try {
+                update = JSON.parse(update);
+              } catch {
+                update = undefined;
+              }
+            }
+
+            // 3. If update is still undefined/null, read directly from the incoming request stream
+            if (!update) {
+              let rawStream = '';
+              for await (const chunk of req) {
+                rawStream += chunk;
+              }
+              if (rawStream.trim().length > 0) {
+                try {
+                  update = JSON.parse(rawStream);
+                } catch (streamErr) {
+                  logger.error('Failed to parse incoming webhook body stream:', streamErr);
+                }
+              }
+            }
+
+            // 4. Validate that update is a genuine Telegram update object with update_id
+            if (update && typeof update === 'object' && 'update_id' in update) {
+              await bot.handleUpdate(update, res);
+            } else {
+              logger.warn(`Received Telegram webhook POST without valid update_id: ${JSON.stringify(update)}`);
+            }
           } catch (err) {
             logger.error('Error handling Telegram webhook update:', err);
           } finally {
