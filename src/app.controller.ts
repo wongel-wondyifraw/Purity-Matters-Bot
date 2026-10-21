@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { AppService } from './app.service.js';
 
 @Controller()
@@ -16,7 +16,8 @@ export class AppController {
   }
 
   @Get('api/telegram/status')
-  getTelegramStatus() {
-    return this.appService.getTelegramStatus();
+  getTelegramStatus(@Query('drop_pending') dropPending?: string) {
+    const shouldDrop = dropPending === 'true' || dropPending === '1';
+    return this.appService.getTelegramStatus(shouldDrop);
   }
 }

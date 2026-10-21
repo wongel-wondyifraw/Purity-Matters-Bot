@@ -19,7 +19,7 @@ export class AppService {
     };
   }
 
-  async getTelegramStatus() {
+  async getTelegramStatus(dropPending = false) {
     const token = this.configService.get<string>('telegram.token', '');
     const mode = this.configService.get<string>('telegram.mode', 'polling');
     const webhookDomain = this.configService.get<string>('telegram.webhookDomain', '');
@@ -30,11 +30,24 @@ export class AppService {
 
     let webhookInfo: any = null;
     let botError: string | null = null;
+    let droppedUpdates = false;
 
     if (hasValidToken) {
       try {
         const bot = this.moduleRef.get(getBotToken(), { strict: false });
         if (bot?.telegram) {
+          if (dropPending && mode === 'webhook' && webhookDomain) {
+            const normalizedDomain = webhookDomain.replace(/\/+$/, '');
+            const normalizedPath = (webhookPath.startsWith('/') ? webhookPath : `/${webhookPath}`).replace(/\/+$/, '');
+            const webhookUrl = `${normalizedDomain}${normalizedPath}`;
+            const secret = this.configService.get<string>('telegram.webhookSecret', '');
+
+            await bot.telegram.setWebhook(webhookUrl, {
+              ...(secret ? { secret_token: secret } : {}),
+              drop_pending_updates: true,
+            });
+            droppedUpdates = true;
+          }
           webhookInfo = await bot.telegram.getWebhookInfo();
         }
       } catch (err) {

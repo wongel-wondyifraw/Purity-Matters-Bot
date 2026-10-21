@@ -98,6 +98,11 @@ async function bootstrap() {
     try {
       const bot = app.get(getBotToken());
 
+      // Handle uncaught errors within bot commands so they don't crash or return 500
+      bot.catch((err: any, ctx: any) => {
+        logger.error(`Telegraf update error (update_id: ${ctx?.update?.update_id}):`, err instanceof Error ? err.stack : String(err));
+      });
+
       // Dedicated Telegram webhook middleware.
       // Avoids Express prefix-stripping bugs where bot.webhookCallback fails safeCompare.
       app.use(async (req: Request, res: Response, next: NextFunction) => {
@@ -120,8 +125,11 @@ async function bootstrap() {
             await bot.handleUpdate(update, res);
           } catch (err) {
             logger.error('Error handling Telegram webhook update:', err);
+          } finally {
+            // Telegram strictly requires an HTTP 200 OK acknowledgement,
+            // otherwise it will retry in an infinite loop.
             if (!res.headersSent) {
-              res.status(500).send('Internal Server Error');
+              res.status(200).send('OK');
             }
           }
           return;
