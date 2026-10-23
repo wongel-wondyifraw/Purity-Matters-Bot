@@ -9,6 +9,11 @@ import {
   PhysicalBookOrder,
   PhysicalOrderStatus,
 } from '../database/entities/physical-book-order.entity.js';
+import {
+  ResourceOrder,
+  ResourcePaymentStatus,
+  ResourceFulfillmentStatus,
+} from '../database/entities/resource-order.entity.js';
 
 export interface ResourceItem {
   id: string;
@@ -69,6 +74,8 @@ export class ResourcesService implements OnModuleInit {
     private readonly resourceRepo: Repository<Resource>,
     @InjectRepository(PhysicalBookOrder)
     private readonly physicalOrderRepo: Repository<PhysicalBookOrder>,
+    @InjectRepository(ResourceOrder)
+    private readonly orderRepo: Repository<ResourceOrder>,
   ) {}
 
   async onModuleInit() {
@@ -404,4 +411,208 @@ export class ResourcesService implements OnModuleInit {
   async countPurchases(): Promise<number> {
     return this.purchaseRepo.count();
   }
+
+  // ==========================================
+  // RESOURCE ORDERS & PAYMENT FLOW (Telebirr & CBE)
+  // ==========================================
+
+  async createResourceOrder(data: {
+    resourceId: number;
+    telegramId: string | number;
+    clientName?: string;
+    username?: string;
+    phone?: string;
+    paymentMethod?: string;
+  }): Promise<ResourceOrder> {
+    const resource = await this.findResourceById(data.resourceId);
+    if (!resource) {
+      throw new Error(`Resource #${data.resourceId} not found.`);
+    }
+
+    const orderNumber = `PM-ORD-${new Date().getFullYear()}-${Math.floor(
+      1000 + Math.random() * 9000,
+    )}`;
+
+    const entity = this.orderRepo.create({
+      orderNumber,
+      resourceId: resource.id,
+      resourceTitle: resource.title,
+      resourceType: resource.type,
+      telegramId: String(data.telegramId),
+      clientName: data.clientName || 'Telegram Client',
+      username: data.username || null,
+      phone: data.phone || null,
+      amount: resource.price,
+      currency: resource.currency || 'ETB',
+      paymentMethod: data.paymentMethod || 'telebirr',
+      paymentStatus: 'pending',
+      fulfillmentStatus: 'pending',
+    });
+
+    const saved = await this.orderRepo.save(entity);
+    this.logger.log(`Created ResourceOrder #${saved.orderNumber} for client ${saved.telegramId}`);
+    return saved;
+  }
+
+  async submitOrderPayment(
+    orderId: number,
+    paymentMethod: string,
+    paymentReference?: string,
+  ): Promise<ResourceOrder | null> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) return null;
+
+    order.paymentMethod = paymentMethod;
+    if (paymentReference) {
+      order.paymentReference = paymentReference;
+    }
+    order.paymentStatus = 'payment_submitted';
+    order.paymentSubmittedAt = new Date();
+
+    const saved = await this.orderRepo.save(order);
+    this.logger.log(
+      `Order #${saved.orderNumber} payment submitted via ${paymentMethod} (Ref: ${paymentReference || 'none'}).`,
+    );
+    return saved;
+  }
+
+  async findAllResourceOrders(filter?: {
+    paymentStatus?: string;
+    search?: string;
+  }): Promise<ResourceOrder[]> {
+    const where: any = {};
+    if (filter?.paymentStatus && filter.paymentStatus !== 'all') {
+      where.paymentStatus = filter.paymentStatus;
+    }
+
+    const orders = await this.orderRepo.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+
+    if (filter?.search) {
+      const q = filter.search.toLowerCase().trim();
+      return orders.filter(
+        (o) =>
+          o.orderNumber.toLowerCase().includes(q) ||
+          o.resourceTitle.toLowerCase().includes(q) ||
+          (o.clientName && o.clientName.toLowerCase().includes(q)) ||
+          (o.phone && o.phone.toLowerCase().includes(q)) ||
+          (o.paymentReference && o.paymentReference.toLowerCase().includes(q)) ||
+          o.telegramId.includes(q),
+      );
+    }
+
+    return orders;
+  }
+
+  async findResourceOrderById(id: number): Promise<ResourceOrder | null> {
+    return this.orderRepo.findOne({ where: { id } });
+  }
+
+  async findPendingOrderByUserAndResource(
+    telegramId: string | number,
+    resourceId: number,
+  ): Promise<ResourceOrder | null> {
+    return this.orderRepo.findOne({
+      where: {
+        telegramId: String(telegramId),
+        resourceId,
+        paymentStatus: 'pending',
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async confirmOrderPayment(
+    orderId: number,
+    adminNotes?: string,
+  ): Promise<{ order: ResourceOrder; resource: Resource | null; alreadyVerified: boolean }> {
+    const order = await this.findResourceOrderById(orderId);
+    if (!order) {
+      throw new Error(`Order #${orderId} not found.`);
+    }
+
+    const resource = await this.findResourceById(order.resourceId);
+
+    if (order.paymentStatus === 'verified' && order.fulfillmentStatus === 'delivered') {
+      return { order, resource, alreadyVerified: true };
+    }
+
+    order.paymentStatus = 'verified';
+    order.verifiedAt = new Date();
+    if (adminNotes) {
+      order.adminNotes = adminNotes;
+    }
+
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Also grant permanent access in resource_purchase table
+    if (resource) {
+      await this.purchaseRepo.save({
+        telegramId: savedOrder.telegramId,
+        resourceId: String(resource.id),
+        resourceTitle: resource.title,
+        amount: savedOrder.amount,
+        currency: savedOrder.currency,
+        status: 'completed',
+        downloadUrl: resource.filePath || null,
+      });
+    }
+
+    this.logger.log(`Confirmed payment for order #${savedOrder.orderNumber}`);
+    return { order: savedOrder, resource, alreadyVerified: false };
+  }
+
+  async rejectOrderPayment(
+    orderId: number,
+    reason: string,
+  ): Promise<ResourceOrder | null> {
+    const order = await this.findResourceOrderById(orderId);
+    if (!order) return null;
+
+    order.paymentStatus = 'rejected';
+    order.adminNotes = reason || 'Payment could not be verified.';
+    const saved = await this.orderRepo.save(order);
+    this.logger.log(`Rejected payment for order #${saved.orderNumber}: ${reason}`);
+    return saved;
+  }
+
+  async markOrderDelivered(orderId: number): Promise<ResourceOrder | null> {
+    const order = await this.findResourceOrderById(orderId);
+    if (!order) return null;
+
+    order.fulfillmentStatus = 'delivered';
+    return this.orderRepo.save(order);
+  }
+
+  async markOrderDeliveryFailed(
+    orderId: number,
+    errorMsg: string,
+  ): Promise<ResourceOrder | null> {
+    const order = await this.findResourceOrderById(orderId);
+    if (!order) return null;
+
+    order.fulfillmentStatus = 'failed_delivery';
+    order.adminNotes = `${order.adminNotes ? `${order.adminNotes} | ` : ''}Delivery Error: ${errorMsg}`;
+    return this.orderRepo.save(order);
+  }
+
+  async deletePhysicalOrder(id: number): Promise<boolean> {
+    const order = await this.findPhysicalOrderById(id);
+    if (!order) return false;
+    await this.physicalOrderRepo.remove(order);
+    this.logger.log(`Deleted PhysicalBookOrder #${id} (${order.orderNumber})`);
+    return true;
+  }
+
+  async deleteResourceOrder(id: number): Promise<boolean> {
+    const order = await this.findResourceOrderById(id);
+    if (!order) return false;
+    await this.orderRepo.remove(order);
+    this.logger.log(`Deleted ResourceOrder #${id} (${order.orderNumber})`);
+    return true;
+  }
 }
+
+

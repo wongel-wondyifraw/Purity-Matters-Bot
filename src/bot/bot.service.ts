@@ -1,12 +1,85 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Markup } from 'telegraf';
+import { InjectBot } from 'nestjs-telegraf';
+import { Telegraf, Markup } from 'telegraf';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Client } from '../database/entities/client.entity.js';
 import { CourseDefinition, CourseLesson } from '../features/courses.service.js';
 import { ResourceItem } from '../features/resources.service.js';
+import { PaymentAccountsResponse } from '../features/payment-settings.service.js';
 
 @Injectable()
 export class BotService {
   private readonly logger = new Logger(BotService.name);
+
+  constructor(
+    @InjectBot()
+    private readonly bot: Telegraf<any>,
+  ) {}
+
+  async sendDocumentToUser(
+    telegramId: string | number,
+    filePath: string,
+    fileName: string,
+    caption?: string,
+  ): Promise<boolean> {
+    try {
+      if (!this.bot?.telegram?.sendDocument) {
+        this.logger.warn('Telegraf sendDocument skipped: bot not initialized');
+        return false;
+      }
+
+      const fullDiskPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(
+            process.cwd(),
+            filePath.startsWith('/') ? filePath.slice(1) : filePath,
+          );
+
+      if (!fs.existsSync(fullDiskPath)) {
+        throw new Error(`File does not exist on disk: ${fullDiskPath}`);
+      }
+
+      await this.bot.telegram.sendDocument(
+        telegramId,
+        {
+          source: fs.createReadStream(fullDiskPath),
+          filename: fileName,
+        },
+        {
+          caption:
+            caption ||
+            `🎉 <b>Payment Verified!</b>\nHere is your official copy of: <b>${fileName}</b>.\nGod bless your journey to purity!`,
+          parse_mode: 'HTML',
+        },
+      );
+      this.logger.log(
+        `Successfully dispatched document ${fileName} to telegram user ${telegramId}`,
+      );
+      return true;
+    } catch (err: any) {
+      this.logger.error(`Error sending document to ${telegramId}: ${err.message}`, err);
+      throw err;
+    }
+  }
+
+  async sendMessageToUser(
+    telegramId: string | number,
+    message: string,
+  ): Promise<boolean> {
+    try {
+      if (!this.bot?.telegram?.sendMessage) {
+        return false;
+      }
+      await this.bot.telegram.sendMessage(telegramId, message, {
+        parse_mode: 'HTML',
+      });
+      return true;
+    } catch (err: any) {
+      this.logger.error(`Error sending message to ${telegramId}: ${err.message}`, err);
+      return false;
+    }
+  }
 
   getWelcomeMessage(client: Client): string {
     const name = client.fullName ?? client.firstName ?? client.username ?? 'Friend';
@@ -189,32 +262,91 @@ export class BotService {
   }
 
   // --- D. Resources & E-Books Keyboards ---
-  getResourcesMenuKeyboard(catalog: ResourceItem[]) {
-    const buttons = catalog.map((item) => [
-      Markup.button.callback(
-        `${item.title} ${item.isPaid ? `($${item.price})` : '(FREE)'}`,
-        `res_view_${item.id}`,
-      ),
-    ]);
+  getResourcesMenuKeyboard(catalog: any[]) {
+    const buttons = catalog.map((item) => {
+      const isPaid = item.pricingType ? item.pricingType === 'paid' : !!item.isPaid;
+      const priceText = isPaid ? `(${item.price} ${item.currency || 'ETB'})` : '(FREE)';
+      return [
+        Markup.button.callback(
+          `${item.title} ${priceText}`,
+          `res_view_${item.id}`,
+        ),
+      ];
+    });
     buttons.push([Markup.button.callback('💼 My Purchases', 'res_my_purchases')]);
     buttons.push([Markup.button.callback('🔙 Return to Services', 'cmd_services')]);
     return Markup.inlineKeyboard(buttons);
   }
 
-  getResourceDetailKeyboard(resource: ResourceItem, hasPurchased: boolean) {
+  getResourceDetailKeyboard(resource: any, hasPurchased: boolean) {
     const buttons: any[] = [];
-    if (!resource.isPaid || hasPurchased) {
-      buttons.push([Markup.button.url('📥 Open / Download File', resource.downloadUrl)]);
+    const isFree = resource.pricingType === 'free' || resource.isPaid === false || Number(resource.price) === 0;
+
+    if (isFree || hasPurchased) {
+      buttons.push([
+        Markup.button.callback('📥 Download / Receive File', `res_dl_${resource.id}`),
+      ]);
     } else {
+      const price = resource.price || 250;
+      const currency = resource.currency || 'ETB';
       buttons.push([
         Markup.button.callback(
-          `💳 Purchase E-Book ($${resource.price} / 250 ETB)`,
+          `💳 Purchase (${price} ${currency})`,
           `res_buy_${resource.id}`,
         ),
       ]);
     }
     buttons.push([Markup.button.callback('🔙 Back to Catalog', 'srv_resources')]);
     return Markup.inlineKeyboard(buttons);
+  }
+
+  getPaymentInstructionsMessage(
+    resourceTitle: string,
+    amount: number,
+    currency: string,
+    orderNumber: string,
+    accounts: PaymentAccountsResponse,
+  ): string {
+    let msg = `💳 <b>Payment Required for:</b>\n<b>${resourceTitle}</b>\n\n`;
+    msg += `💰 <b>Amount:</b> <b>${amount} ${currency}</b>\n`;
+    msg += `🔖 <b>Order Reference:</b> <code>${orderNumber}</code> <i>(tap to copy)</i>\n\n`;
+    msg += `Please transfer <b>${amount} ${currency}</b> using either account below, putting <code>${orderNumber}</code> in the transfer reason/remarks:\n\n`;
+
+    if (accounts.telebirr.isActive) {
+      msg += `📱 <b>Telebirr:</b>\n`;
+      msg += `• Account: <code>${accounts.telebirr.accountNumber}</code> <i>(tap to copy)</i>\n`;
+      msg += `• Receiver: <b>${accounts.telebirr.accountName}</b>\n`;
+      if (accounts.telebirr.instructions) {
+        msg += `• Note: <i>${accounts.telebirr.instructions}</i>\n`;
+      }
+      msg += `\n`;
+    }
+
+    if (accounts.cbe.isActive) {
+      msg += `🏦 <b>Commercial Bank of Ethiopia (CBE):</b>\n`;
+      msg += `• Account: <code>${accounts.cbe.accountNumber}</code> <i>(tap to copy)</i>\n`;
+      msg += `• Receiver: <b>${accounts.cbe.accountName}</b>\n`;
+      if (accounts.cbe.branchOrShortcode) {
+        msg += `• Branch: ${accounts.cbe.branchOrShortcode}\n`;
+      }
+      if (accounts.cbe.instructions) {
+        msg += `• Note: <i>${accounts.cbe.instructions}</i>\n`;
+      }
+      msg += `\n`;
+    }
+
+    msg += `👇 <b>After transferring, tap your payment method below:</b>`;
+    return msg;
+  }
+
+  getPaymentActionKeyboard(orderId: number) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📱 Paid via Telebirr', `pay_confirm_${orderId}_telebirr`),
+        Markup.button.callback('🏦 Paid via CBE', `pay_confirm_${orderId}_cbe`),
+      ],
+      [Markup.button.callback('❌ Cancel Order', `pay_cancel_${orderId}`)],
+    ]);
   }
 
   getPhoneShareKeyboard() {

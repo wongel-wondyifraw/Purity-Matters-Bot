@@ -7,12 +7,15 @@ import { ResourcePurchase } from '../database/entities/resource-purchase.entity.
 import { Resource } from '../database/entities/resource.entity.js';
 import { PhysicalBookOrder } from '../database/entities/physical-book-order.entity.js';
 import { AnonymousQuestion } from '../database/entities/anonymous-question.entity.js';
+import { PaymentSetting } from '../database/entities/payment-setting.entity.js';
+import { ResourceOrder } from '../database/entities/resource-order.entity.js';
 import { ClientsModule } from '../clients/clients.module.js';
 import { CounselingService } from './counseling.service.js';
 import { InnerHealingService } from './inner-healing.service.js';
 import { CoursesService } from './courses.service.js';
 import { ResourcesService } from './resources.service.js';
 import { AnonymousQuestionsService } from './anonymous-questions.service.js';
+import { PaymentSettingsService } from './payment-settings.service.js';
 import { QuestionsController } from './questions.controller.js';
 
 @Module({
@@ -26,6 +29,8 @@ import { QuestionsController } from './questions.controller.js';
       Resource,
       PhysicalBookOrder,
       AnonymousQuestion,
+      PaymentSetting,
+      ResourceOrder,
     ]),
   ],
   controllers: [QuestionsController],
@@ -35,6 +40,7 @@ import { QuestionsController } from './questions.controller.js';
     CoursesService,
     ResourcesService,
     AnonymousQuestionsService,
+    PaymentSettingsService,
   ],
   exports: [
     CounselingService,
@@ -42,6 +48,7 @@ import { QuestionsController } from './questions.controller.js';
     CoursesService,
     ResourcesService,
     AnonymousQuestionsService,
+    PaymentSettingsService,
   ],
 })
 export class FeaturesModule {}

@@ -23,6 +23,8 @@ import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
+import { PaymentSettingsService } from '../features/payment-settings.service.js';
+import { BotService } from '../bot/bot.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
 
@@ -35,6 +37,8 @@ export class AdminController {
     private readonly coursesService: CoursesService,
     private readonly resourcesService: ResourcesService,
     private readonly questionsService: AnonymousQuestionsService,
+    private readonly paymentSettingsService: PaymentSettingsService,
+    private readonly botService: BotService,
   ) {}
 
   @Get('stats')
@@ -461,4 +465,162 @@ export class AdminController {
     }
     return { success: true, message: `Question #${id} deleted successfully.` };
   }
+
+  // ==========================================
+  // PAYMENT SETTINGS (Telebirr & CBE)
+  // ==========================================
+
+  @Get('payment-settings')
+  async getPaymentSettings() {
+    return this.paymentSettingsService.getFormattedAccounts();
+  }
+
+  @Patch('payment-settings')
+  async updatePaymentSettings(
+    @Body()
+    body: {
+      telebirr?: any;
+      cbe?: any;
+    },
+  ) {
+    return this.paymentSettingsService.updateAccounts(body);
+  }
+
+  // ==========================================
+  // RESOURCE ORDERS & PAYMENT CONFIRMATION
+  // ==========================================
+
+  @Get('resource-orders')
+  async getResourceOrders(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.resourcesService.findAllResourceOrders({
+      paymentStatus: status,
+      search,
+    });
+  }
+
+  @Post('resource-orders/:id/confirm-payment')
+  async confirmResourceOrderPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { adminNotes?: string },
+  ) {
+    const { order, resource, alreadyVerified } =
+      await this.resourcesService.confirmOrderPayment(id, body?.adminNotes);
+
+    if (alreadyVerified) {
+      return {
+        success: true,
+        order,
+        message: 'Order was already verified and delivered.',
+      };
+    }
+
+    let dispatchResult = false;
+    let dispatchError: string | null = null;
+
+    // If resource has a file attached, automatically dispatch it to the user via Telegram Bot!
+    if (resource && resource.filePath) {
+      try {
+        const fullDiskPath = path.isAbsolute(resource.filePath)
+          ? resource.filePath
+          : path.resolve(
+              process.cwd(),
+              resource.filePath.startsWith('/')
+                ? resource.filePath.slice(1)
+                : resource.filePath,
+            );
+
+        if (fs.existsSync(fullDiskPath)) {
+          const caption =
+            `🎉 <b>Payment Verified!</b>\n\n` +
+            `Thank you for your purchase of <b>${resource.title}</b>.\n` +
+            `Here is your official digital file. You can download and keep it permanently!`;
+
+          dispatchResult = await this.botService.sendDocumentToUser(
+            order.telegramId,
+            fullDiskPath,
+            resource.fileName || `${resource.title}.pdf`,
+            caption,
+          );
+
+          if (dispatchResult) {
+            await this.resourcesService.markOrderDelivered(order.id);
+            order.fulfillmentStatus = 'delivered';
+          }
+        } else {
+          dispatchError = `File not found on server at ${fullDiskPath}`;
+          await this.resourcesService.markOrderDeliveryFailed(order.id, dispatchError);
+          order.fulfillmentStatus = 'failed_delivery';
+        }
+      } catch (err: any) {
+        dispatchError = err.message || 'Failed to dispatch document';
+        await this.resourcesService.markOrderDeliveryFailed(order.id, dispatchError || 'Unknown dispatch error');
+        order.fulfillmentStatus = 'failed_delivery';
+      }
+    } else {
+      // If no file attached or physical book, send confirmation text message
+      await this.botService.sendMessageToUser(
+        order.telegramId,
+        `🎉 <b>Payment Verified!</b>\n\n` +
+          `Your payment for <b>${order.resourceTitle}</b> (Order <code>${order.orderNumber}</code>) has been confirmed by our ministry team!`,
+      );
+      await this.resourcesService.markOrderDelivered(order.id);
+      order.fulfillmentStatus = 'delivered';
+    }
+
+    return {
+      success: true,
+      order,
+      dispatched: dispatchResult,
+      dispatchError,
+    };
+  }
+
+  @Post('resource-orders/:id/reject-payment')
+  async rejectResourceOrderPayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason: string },
+  ) {
+    if (!body || !body.reason || !body.reason.trim()) {
+      throw new BadRequestException('Rejection reason is required.');
+    }
+
+    const order = await this.resourcesService.rejectOrderPayment(id, body.reason.trim());
+    if (!order) {
+      throw new NotFoundException(`Order #${id} not found.`);
+    }
+
+    // Notify user on Telegram
+    await this.botService.sendMessageToUser(
+      order.telegramId,
+      `⚠️ <b>Payment Notice for Order ${order.orderNumber}</b>\n\n` +
+        `Our team could not verify the transfer for <b>${order.resourceTitle}</b>.\n\n` +
+        `<b>Reason:</b> ${body.reason.trim()}\n\n` +
+        `Please verify your transfer in your Telebirr / CBE app or contact our team if you believe this is an error.`,
+    );
+
+    return { success: true, order };
+  }
+
+  @Delete('resources/orders/:id')
+  async deletePhysicalOrder(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.resourcesService.deletePhysicalOrder(id);
+    if (!success) {
+      throw new NotFoundException(`Physical order #${id} not found.`);
+    }
+    return { success: true, message: `Physical order #${id} deleted successfully.` };
+  }
+
+  @Delete('resource-orders/:id')
+  async deleteResourceOrder(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.resourcesService.deleteResourceOrder(id);
+    if (!success) {
+      throw new NotFoundException(`Resource order #${id} not found.`);
+    }
+    return { success: true, message: `Resource order #${id} deleted successfully.` };
+  }
 }
+
+

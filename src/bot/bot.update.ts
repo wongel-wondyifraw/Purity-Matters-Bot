@@ -7,6 +7,7 @@ import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
+import { PaymentSettingsService } from '../features/payment-settings.service.js';
 
 @Update()
 export class BotUpdate {
@@ -19,6 +20,7 @@ export class BotUpdate {
     private readonly innerHealingService: InnerHealingService,
     private readonly coursesService: CoursesService,
     private readonly resourcesService: ResourcesService,
+    private readonly paymentSettingsService: PaymentSettingsService,
   ) {}
 
   @Start()
@@ -498,7 +500,7 @@ export class BotUpdate {
   }
 
   // ==========================================
-  // D. RESOURCES & E-BOOKS FLOW
+  // D. RESOURCES & E-BOOKS FLOW (Telebirr & CBE)
   // ==========================================
   @Action('srv_resources')
   @Hears(['📖 D. Resources & E-Books', '📖 Resources'])
@@ -508,10 +510,13 @@ export class BotUpdate {
       await ctx.answerCbQuery();
     }
 
-    const catalog = this.resourcesService.getCatalog();
+    const dbResources = await this.resourcesService.findAllResources();
+    const catalog = dbResources.length > 0 ? dbResources : this.resourcesService.getCatalog();
+
     await ctx.replyWithHTML(
-      '📖 <b>Resources & E-Books Catalog</b>\n\n' +
-      'Explore our curated collection of free workbooks and transformative e-books:',
+      '📖 <b>Ministry Resources & E-Books Catalog</b>\n\n' +
+        'Explore our collection of purity workbooks, guides, and transformative e-books.\n' +
+        'Free materials can be downloaded immediately, while paid resources support Telebirr and CBE bank transfers:',
       this.botService.getResourcesMenuKeyboard(catalog),
     );
   }
@@ -521,21 +526,34 @@ export class BotUpdate {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
-    const resourceId = (ctx as any).match[1];
-    const item = this.resourcesService.getResource(resourceId);
+    const rawId = (ctx as any).match[1];
+    let item: any = null;
+
+    if (!isNaN(Number(rawId))) {
+      item = await this.resourcesService.findResourceById(Number(rawId));
+    }
     if (!item) {
-      await ctx.replyWithHTML('⚠️ Resource not found.');
+      item = this.resourcesService.getResource(rawId);
+    }
+    if (!item) {
+      await ctx.replyWithHTML('⚠️ Resource not found or no longer active.');
       return;
     }
 
-    const hasAccess = await this.resourcesService.hasAccess(ctx.from.id, resourceId);
+    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
+    const hasAccess = isFree || (await this.resourcesService.hasAccess(ctx.from.id, String(item.id)));
+
+    const priceText = isFree ? 'FREE' : `${item.price} ${item.currency || 'ETB'}`;
+    const statusText = hasAccess
+      ? '✅ Available for Download'
+      : '🔒 Purchase Required (Telebirr / CBE)';
 
     const message =
       `<b>${item.title}</b>\n\n` +
-      `• <b>Type:</b> ${item.isPaid ? 'Premium E-Book' : 'Free Download'}\n` +
-      `• <b>Price:</b> ${item.isPaid ? `$${item.price} USD / 250 ETB` : 'FREE'}\n` +
-      `• <b>Status:</b> ${hasAccess ? '✅ Accessible' : '🔒 Purchase Required'}\n\n` +
-      `📝 <b>Overview:</b>\n${item.description}`;
+      `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+      `• <b>Price:</b> <b>${priceText}</b>\n` +
+      `• <b>Access:</b> ${statusText}\n\n` +
+      `📝 <b>Overview:</b>\n${item.description || 'No description provided.'}`;
 
     await ctx.replyWithHTML(
       message,
@@ -543,23 +561,147 @@ export class BotUpdate {
     );
   }
 
+  @Action(/^res_dl_(.+)$/)
+  async onResDl(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const rawId = (ctx as any).match[1];
+    let item: any = null;
+
+    if (!isNaN(Number(rawId))) {
+      item = await this.resourcesService.findResourceById(Number(rawId));
+    }
+    if (!item) {
+      item = this.resourcesService.getResource(rawId);
+    }
+    if (!item) {
+      await ctx.replyWithHTML('⚠️ Resource not found.');
+      return;
+    }
+
+    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
+    const hasAccess = isFree || (await this.resourcesService.hasAccess(ctx.from.id, String(item.id)));
+
+    if (!hasAccess) {
+      await ctx.replyWithHTML('🔒 Purchase is required to download this resource.');
+      return;
+    }
+
+    if (item.filePath) {
+      await ctx.replyWithHTML('⏳ <i>Sending document to your chat...</i>');
+      try {
+        await this.botService.sendDocumentToUser(
+          ctx.from.id,
+          item.filePath,
+          item.fileName || `${item.title}.pdf`,
+          `📖 <b>${item.title}</b>\nGod bless your journey to purity!`,
+        );
+      } catch (err) {
+        await ctx.replyWithHTML(
+          '⚠️ Could not send document directly. Please contact our support team or check back shortly.',
+        );
+      }
+    } else if (item.downloadUrl) {
+      await ctx.replyWithHTML(
+        `📥 <b>Download Link:</b>\n<a href="${item.downloadUrl}">Click here to open ${item.title}</a>`,
+      );
+    } else {
+      await ctx.replyWithHTML('ℹ️ Document file will be delivered by our pastoral team.');
+    }
+  }
+
   @Action(/^res_buy_(.+)$/)
   async onResBuy(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
-    const resourceId = (ctx as any).match[1];
-    const item = this.resourcesService.getResource(resourceId);
+    const rawId = (ctx as any).match[1];
+    let item: any = null;
+
+    if (!isNaN(Number(rawId))) {
+      item = await this.resourcesService.findResourceById(Number(rawId));
+    }
+    if (!item) {
+      item = this.resourcesService.getResource(rawId);
+    }
     if (!item) return;
 
-    // Simulate / Process server-side payment verification
-    await this.resourcesService.grantAccess(ctx.from.id, resourceId);
+    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
+    if (isFree) {
+      await this.resourcesService.grantAccess(ctx.from.id, String(item.id));
+      await ctx.replyWithHTML('🎉 This resource is free! Tap below to download:', this.botService.getResourceDetailKeyboard(item, true));
+      return;
+    }
+
+    // Get live Telebirr & CBE account settings
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    // Check if client has a pending order for this resource or create new order
+    let order = await this.resourcesService.findPendingOrderByUserAndResource(
+      ctx.from.id,
+      item.id,
+    );
+
+    if (!order) {
+      const client = await this.clientsService.findByTelegramId(ctx.from.id);
+      order = await this.resourcesService.createResourceOrder({
+        resourceId: item.id,
+        telegramId: ctx.from.id,
+        clientName: client?.fullName || ctx.from.first_name || 'Client',
+        username: ctx.from.username,
+        phone: client?.phone || undefined,
+      });
+    }
+
+    const instructionsMsg = this.botService.getPaymentInstructionsMessage(
+      item.title,
+      item.price,
+      item.currency || 'ETB',
+      order.orderNumber,
+      accounts,
+    );
+
+    await ctx.replyWithHTML(instructionsMsg, this.botService.getPaymentActionKeyboard(order.id));
+  }
+
+  @Action(/^pay_confirm_(\d+)_(telebirr|cbe)$/)
+  async onPayConfirm(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const orderId = parseInt((ctx as any).match[1], 10);
+    const method = (ctx as any).match[2];
+
+    const order = await this.resourcesService.submitOrderPayment(orderId, method);
+    if (!order) {
+      await ctx.replyWithHTML('⚠️ Could not locate order record.');
+      return;
+    }
+
+    const providerName = method === 'telebirr' ? 'Telebirr' : 'Commercial Bank of Ethiopia (CBE)';
 
     await ctx.replyWithHTML(
-      `🎉 <b>Payment Verified!</b>\n\n` +
-      `You now have permanent access to: <b>${item.title}</b>.\n` +
-      `You can download it now or access it anytime under "My Purchases":`,
-      this.botService.getResourceDetailKeyboard(item, true),
+      `✅ <b>Payment Confirmation Received!</b>\n\n` +
+        `Your order <code>${order.orderNumber}</code> for <b>${order.resourceTitle}</b> has been submitted as <b>Paid via ${providerName}</b>.\n\n` +
+        `Our ministry team has received your order and is verifying the transfer.\n\n` +
+        `<b>As soon as confirmed by our admin console, your resource will be automatically sent right here in this chat!</b>\n\n` +
+        `<i>Tip: You can reply to this message with your Transaction Reference number (or copy-paste your bank SMS) to help our team verify even faster.</i>`,
+      this.botService.getServicesMenuKeyboard(),
+    );
+  }
+
+  @Action(/^pay_cancel_(\d+)$/)
+  async onPayCancel(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const orderId = parseInt((ctx as any).match[1], 10);
+    await this.resourcesService.rejectOrderPayment(orderId, 'Cancelled by user');
+
+    await ctx.replyWithHTML(
+      '❌ <b>Order Cancelled</b>\n\nYou can browse our resources anytime using the button below:',
+      this.botService.getServicesMenuKeyboard(),
     );
   }
 
@@ -579,7 +721,7 @@ export class BotUpdate {
 
     let msg = '💼 <b>My Purchased E-Books & Materials:</b>\n\n';
     for (const p of purchases) {
-      msg += `• <b>${p.resourceTitle}</b>\n  Download: ${p.downloadUrl ?? 'Available'}\n\n`;
+      msg += `• <b>${p.resourceTitle}</b>\n  Status: ✅ Verified & Accessible\n\n`;
     }
 
     await ctx.replyWithHTML(msg, this.botService.getServicesMenuKeyboard());
@@ -634,6 +776,29 @@ export class BotUpdate {
         'Description saved! 👍\n\n' +
         '📞 <b>Step 3/4: Preferred Method</b>\n\nPlease select your preferred session format:',
         this.botService.getCounselingMethodKeyboard(),
+      );
+      return;
+    }
+
+    // Check if user has an order awaiting payment reference and sent reference code/SMS
+    const pendingOrders = await this.resourcesService.findAllResourceOrders({
+      paymentStatus: 'payment_submitted',
+    });
+    const fromId = ctx.from.id;
+    const awaitingRefOrder = pendingOrders.find(
+      (o) => String(o.telegramId) === String(fromId) && !o.paymentReference,
+    );
+
+    if (awaitingRefOrder && text.length >= 3 && text.length <= 60) {
+      await this.resourcesService.submitOrderPayment(
+        awaitingRefOrder.id,
+        awaitingRefOrder.paymentMethod,
+        text,
+      );
+      await ctx.replyWithHTML(
+        `👍 <b>Reference Code Recorded!</b>\n` +
+          `Transaction code <code>${text}</code> attached to Order <code>${awaitingRefOrder.orderNumber}</code>.\n` +
+          `Our pastoral team will review and deliver your e-book shortly!`,
       );
       return;
     }

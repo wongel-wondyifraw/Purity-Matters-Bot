@@ -11,6 +11,8 @@ import { Resource } from './database/entities/resource.entity.js';
 import { PhysicalBookOrder } from './database/entities/physical-book-order.entity.js';
 import { User } from './database/entities/user.entity.js';
 import { AnonymousQuestion } from './database/entities/anonymous-question.entity.js';
+import { PaymentSetting } from './database/entities/payment-setting.entity.js';
+import { ResourceOrder } from './database/entities/resource-order.entity.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { FeaturesModule } from './features/features.module.js';
 import { BotModule } from './bot/bot.module.js';
@@ -45,6 +47,8 @@ import { AppService } from './app.service.js';
           PhysicalBookOrder,
           User,
           AnonymousQuestion,
+          PaymentSetting,
+          ResourceOrder,
         ],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),
