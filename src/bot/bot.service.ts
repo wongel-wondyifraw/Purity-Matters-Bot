@@ -230,6 +230,7 @@ export class BotService {
       `${escapeHtml(data.question)}\n\n` +
       `<b>Answer:</b>\n` +
       `${escapeHtml(data.answer)}\n\n` +
+      `for questions / ለመጠየቅ ፡ https://anonymous.puritymattersethiopia.com/\n\n` +
       `#PurityMatters`;
 
     try {
