@@ -111,6 +111,15 @@ export class AnonymousQuestionsService {
     return saved;
   }
 
+  async updateChannelPost(id: number, messageId: number): Promise<void> {
+    await this.questionRepo.update(id, {
+      postedToChannel: true,
+      telegramMessageId: messageId,
+      postedToChannelAt: new Date(),
+    });
+    this.logger.log(`Recorded Telegram channel broadcast for Question #${id} (Message ID: ${messageId})`);
+  }
+
   async deleteQuestion(id: number): Promise<boolean> {
     const question = await this.findById(id);
     if (!question) return false;

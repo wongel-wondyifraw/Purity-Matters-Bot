@@ -37,6 +37,15 @@ export class AnonymousQuestion {
   @Column({ type: 'boolean', default: true })
   isPublic: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  postedToChannel: boolean;
+
+  @Column({ type: 'bigint', nullable: true })
+  telegramMessageId?: number | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  postedToChannelAt?: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

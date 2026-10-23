@@ -461,12 +461,37 @@ export class AdminController {
       answer: string;
       assignedCounselor?: string | null;
       isPublic?: boolean;
+      postToChannel?: boolean;
     },
   ) {
     if (!body || !body.answer || !body.answer.trim()) {
       throw new BadRequestException('Answer text is required.');
     }
-    return this.questionsService.answerQuestion(id, body);
+
+    const saved = await this.questionsService.answerQuestion(id, body);
+
+    let channelBroadcast: { success: boolean; messageId?: number; error?: string } | null = null;
+    if (body.postToChannel) {
+      channelBroadcast = await this.botService.broadcastQuestionToChannel({
+        referenceNumber: saved.referenceNumber,
+        category: saved.category,
+        question: saved.question,
+        answer: saved.answer!,
+        counselorName: saved.assignedCounselor,
+      });
+
+      if (channelBroadcast.success && channelBroadcast.messageId) {
+        await this.questionsService.updateChannelPost(saved.id, channelBroadcast.messageId);
+        saved.postedToChannel = true;
+        saved.telegramMessageId = channelBroadcast.messageId;
+        saved.postedToChannelAt = new Date();
+      }
+    }
+
+    return {
+      ...saved,
+      channelBroadcast,
+    };
   }
 
   @Delete('questions/:id')

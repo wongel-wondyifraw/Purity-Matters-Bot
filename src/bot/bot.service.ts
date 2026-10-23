@@ -195,6 +195,74 @@ export class BotService {
     }
   }
 
+  /**
+   * Broadcast an answered anonymous question to the configured Telegram channel
+   */
+  async broadcastQuestionToChannel(data: {
+    referenceNumber: string;
+    category: string;
+    question: string;
+    answer: string;
+    counselorName?: string | null;
+  }): Promise<{ success: boolean; messageId?: number; error?: string }> {
+    const channelId = process.env.TELEGRAM_QUESTIONS_CHANNEL_ID;
+    if (!channelId || !channelId.trim()) {
+      const msg = 'TELEGRAM_QUESTIONS_CHANNEL_ID is not configured in .env; skipping channel post.';
+      this.logger.warn(msg);
+      return { success: false, error: msg };
+    }
+
+    if (!this.bot?.telegram?.sendMessage) {
+      const msg = 'Telegram bot instance is not initialized or ready.';
+      this.logger.warn(msg);
+      return { success: false, error: msg };
+    }
+
+    // Helper to escape HTML characters for Telegram HTML parse_mode
+    const escapeHtml = (str: string) =>
+      (str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Clean up hashtag labels
+    const rawCategory = data.category || 'General';
+    const categoryHashtag = '#' + rawCategory.replace(/[^a-zA-Z0-9]/g, '');
+    const refHashtag = '#' + data.referenceNumber.replace(/[^a-zA-Z0-9_]/g, '_');
+    const counselor = data.counselorName?.trim() || 'Purity Matters Pastoral Care';
+
+    const formattedPost =
+      `💬 <b>ANONYMOUS INQUIRY & PASTORAL COUNSEL</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔖 <b>Ref:</b> <code>${escapeHtml(data.referenceNumber)}</code>\n` +
+      `🏷️ <b>Topic:</b> ${categoryHashtag} ${refHashtag}\n\n` +
+      `❓ <b>Confidential Inquiry:</b>\n` +
+      `<blockquote>${escapeHtml(data.question)}</blockquote>\n\n` +
+      `🕊️ <b>Pastoral Care Response:</b>\n` +
+      `${escapeHtml(data.answer)}\n\n` +
+      `✍️ <i>Counsel provided by: ${escapeHtml(counselor)}</i>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔒 <i>Ask your confidential questions anonymously via our Telegram Bot.</i>\n` +
+      `#PurityMatters #SpiritualWholeness #PastoralCare`;
+
+    try {
+      const sent = await this.bot.telegram.sendMessage(channelId.trim(), formattedPost, {
+        parse_mode: 'HTML',
+      });
+
+      this.logger.log(
+        `Successfully broadcast Question #${data.referenceNumber} to Telegram channel ${channelId} (Message ID: ${sent.message_id})`
+      );
+      return { success: true, messageId: sent.message_id };
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to broadcast Question #${data.referenceNumber} to channel ${channelId}: ${err.message}`,
+        err.stack,
+      );
+      return { success: false, error: err.message };
+    }
+  }
+
   getWelcomeMessage(client: Client): string {
     const name = client.fullName ?? client.firstName ?? client.username ?? 'Friend';
     return (
