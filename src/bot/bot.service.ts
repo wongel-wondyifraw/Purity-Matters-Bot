@@ -225,25 +225,12 @@ export class BotService {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    // Clean up hashtag labels
-    const rawCategory = data.category || 'General';
-    const categoryHashtag = '#' + rawCategory.replace(/[^a-zA-Z0-9]/g, '');
-    const refHashtag = '#' + data.referenceNumber.replace(/[^a-zA-Z0-9_]/g, '_');
-    const counselor = data.counselorName?.trim() || 'Purity Matters Pastoral Care';
-
     const formattedPost =
-      `💬 <b>ANONYMOUS INQUIRY & PASTORAL COUNSEL</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🔖 <b>Ref:</b> <code>${escapeHtml(data.referenceNumber)}</code>\n` +
-      `🏷️ <b>Topic:</b> ${categoryHashtag} ${refHashtag}\n\n` +
-      `❓ <b>Confidential Inquiry:</b>\n` +
-      `<blockquote>${escapeHtml(data.question)}</blockquote>\n\n` +
-      `🕊️ <b>Pastoral Care Response:</b>\n` +
+      `<b>Question:</b>\n` +
+      `${escapeHtml(data.question)}\n\n` +
+      `<b>Answer:</b>\n` +
       `${escapeHtml(data.answer)}\n\n` +
-      `✍️ <i>Counsel provided by: ${escapeHtml(counselor)}</i>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🔒 <i>Ask your confidential questions anonymously via our Telegram Bot.</i>\n` +
-      `#PurityMatters #SpiritualWholeness #PastoralCare`;
+      `#PurityMatters`;
 
     try {
       const sent = await this.bot.telegram.sendMessage(channelId.trim(), formattedPost, {
