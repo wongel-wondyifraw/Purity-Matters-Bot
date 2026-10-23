@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, FindOptionsWhere } from 'typeorm';
+import { Repository, Like, FindOptionsWhere, In } from 'typeorm';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ResourcePurchase } from '../database/entities/resource-purchase.entity.js';
@@ -348,41 +348,105 @@ export class ResourcesService implements OnModuleInit {
 
   async hasAccess(
     telegramId: string | number,
-    resourceId: string,
+    resourceId: string | number,
   ): Promise<boolean> {
-    const res = this.getResource(resourceId);
-    if (!res || !res.isPaid) return true;
+    const strId = String(resourceId);
+    const numId = Number(resourceId);
 
-    const purchase = await this.purchaseRepo.findOne({
-      where: {
-        telegramId: String(telegramId),
-        resourceId,
-        status: 'completed',
-      },
-    });
-    return !!purchase;
+    // 1. Check database resources first
+    if (!isNaN(numId)) {
+      const dbRes = await this.findResourceById(numId);
+      if (dbRes) {
+        // Free resources are instantly accessible
+        if (dbRes.pricingType === 'free' || Number(dbRes.price) === 0) {
+          return true;
+        }
+
+        // Paid: check verified orders first
+        const verifiedOrder = await this.orderRepo.findOne({
+          where: {
+            telegramId: String(telegramId),
+            resourceId: numId,
+            paymentStatus: 'verified',
+          },
+        });
+        if (verifiedOrder) return true;
+
+        // Paid: check completed purchases
+        const purchase = await this.purchaseRepo.findOne({
+          where: {
+            telegramId: String(telegramId),
+            resourceId: strId,
+            status: 'completed',
+          },
+        });
+        return !!purchase;
+      }
+    }
+
+    // 2. Check legacy / mock catalog items
+    const mockRes = this.getResource(strId);
+    if (mockRes) {
+      if (!mockRes.isPaid || Number(mockRes.price) === 0) {
+        return true;
+      }
+      const purchase = await this.purchaseRepo.findOne({
+        where: {
+          telegramId: String(telegramId),
+          resourceId: strId,
+          status: 'completed',
+        },
+      });
+      return !!purchase;
+    }
+
+    // Not found in database or catalog -> no access
+    return false;
   }
 
   async grantAccess(
     telegramId: string | number,
-    resourceId: string,
+    resourceId: string | number,
   ): Promise<ResourcePurchase | null> {
-    const res = this.getResource(resourceId);
-    if (!res) return null;
+    const strId = String(resourceId);
+    let title = 'Resource Document';
+    let amount = 0;
+    let currency = 'ETB';
+    let downloadUrl: string | null = null;
+
+    if (!isNaN(Number(resourceId))) {
+      const dbRes = await this.findResourceById(Number(resourceId));
+      if (dbRes) {
+        title = dbRes.title;
+        amount = dbRes.price;
+        currency = dbRes.currency || 'ETB';
+        downloadUrl = dbRes.filePath || null;
+      }
+    }
+
+    if (title === 'Resource Document') {
+      const mockRes = this.getResource(strId);
+      if (mockRes) {
+        title = mockRes.title;
+        amount = mockRes.price;
+        currency = mockRes.currency || 'ETB';
+        downloadUrl = mockRes.downloadUrl;
+      }
+    }
 
     let purchase = await this.purchaseRepo.findOne({
-      where: { telegramId: String(telegramId), resourceId },
+      where: { telegramId: String(telegramId), resourceId: strId },
     });
 
     if (!purchase) {
       purchase = this.purchaseRepo.create({
         telegramId: String(telegramId),
-        resourceId,
-        resourceTitle: res.title,
-        amount: res.price,
-        currency: res.currency,
+        resourceId: strId,
+        resourceTitle: title,
+        amount,
+        currency,
         status: 'completed',
-        downloadUrl: res.downloadUrl,
+        downloadUrl: downloadUrl || null,
       });
       await this.purchaseRepo.save(purchase);
       this.logger.log(
@@ -396,10 +460,37 @@ export class ResourcesService implements OnModuleInit {
   async getMyPurchases(
     telegramId: string | number,
   ): Promise<ResourcePurchase[]> {
-    return this.purchaseRepo.find({
+    const purchases = await this.purchaseRepo.find({
       where: { telegramId: String(telegramId), status: 'completed' },
       order: { createdAt: 'DESC' },
     });
+
+    const verifiedOrders = await this.orderRepo.find({
+      where: {
+        telegramId: String(telegramId),
+        paymentStatus: 'verified',
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    for (const order of verifiedOrders) {
+      const exists = purchases.some((p) => p.resourceId === String(order.resourceId));
+      if (!exists) {
+        purchases.push({
+          id: order.id,
+          telegramId: order.telegramId,
+          resourceId: String(order.resourceId),
+          resourceTitle: order.resourceTitle,
+          amount: order.amount,
+          currency: order.currency,
+          status: 'completed',
+          downloadUrl: null,
+          createdAt: order.createdAt,
+        } as ResourcePurchase);
+      }
+    }
+
+    return purchases;
   }
 
   async getAllPurchases(): Promise<ResourcePurchase[]> {
@@ -519,6 +610,20 @@ export class ResourcesService implements OnModuleInit {
         telegramId: String(telegramId),
         resourceId,
         paymentStatus: 'pending',
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findActiveOrderByUserAndResource(
+    telegramId: string | number,
+    resourceId: number,
+  ): Promise<ResourceOrder | null> {
+    return this.orderRepo.findOne({
+      where: {
+        telegramId: String(telegramId),
+        resourceId,
+        paymentStatus: In(['pending', 'payment_submitted', 'verified']),
       },
       order: { createdAt: 'DESC' },
     });

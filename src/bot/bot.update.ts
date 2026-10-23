@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Update, Ctx, Start, Help, Command, Action, On, Hears } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
+import * as path from 'path';
 import type { BotContext } from './bot.interface.js';
 import { BotService } from './bot.service.js';
 import { ClientsService } from '../clients/clients.service.js';
@@ -581,34 +582,88 @@ export class BotUpdate {
       return;
     }
 
-    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
-    const hasAccess = isFree || (await this.resourcesService.hasAccess(ctx.from.id, String(item.id)));
+    const isPaid = item.pricingType ? item.pricingType === 'paid' && Number(item.price) > 0 : (!!item.isPaid && Number(item.price) > 0);
+    const isFree = !isPaid;
     const catType = item.type === 'physical_book' ? 'physical' : 'ebook';
 
+    // 1. Check if user already has verified access / completed purchase
+    const hasAccess = await this.resourcesService.hasAccess(ctx.from.id, String(item.id));
+
     if (isFree || hasAccess) {
+      if (item.type === 'physical_book') {
+        const message =
+          `📦 <b>${item.title}</b>\n\n` +
+          `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+          `• <b>Status:</b> ${isFree ? '✅ Free Print Copy Claimed' : '✅ Payment Verified & Order Confirmed'}\n\n` +
+          `📝 <b>Overview:</b>\n${item.description || 'Ministry physical publication.'}\n\n` +
+          `📦 <i>Our fulfillment team will contact you for courier delivery dispatch.</i>`;
+
+        await ctx.replyWithHTML(
+          message,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back to Physical Books', 'res_cat_physical')],
+            [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+          ]),
+        );
+        return;
+      }
+
+      // Digital E-Book
+      const accessLabel = isFree ? '✅ Available for Immediate Download (FREE)' : '✅ Purchased & Verified';
+      const buttonLabel = isFree ? '📥 Download Free E-Book' : '📥 Download Official E-Book';
       const message =
         `📖 <b>${item.title}</b>\n\n` +
         `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-        `• <b>Access:</b> ✅ Available for Immediate Download (FREE)\n\n` +
+        `• <b>Access:</b> ${accessLabel}\n\n` +
         `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}`;
 
       await ctx.replyWithHTML(
         message,
-        this.botService.getResourceFreeKeyboard(item.id, catType),
+        this.botService.getResourceFreeKeyboard(item.id, catType, buttonLabel),
       );
       return;
     }
 
-    // ==========================================
-    // PAID RESOURCE: Directly display account numbers & "I Have Paid" button
-    // ==========================================
-    const accounts = await this.paymentSettingsService.getFormattedAccounts();
-
-    let order = await this.resourcesService.findPendingOrderByUserAndResource(
+    // 2. Resource is PAID and client has NOT yet been verified.
+    // Check if user already submitted payment and is waiting for admin verification!
+    const activeOrder = await this.resourcesService.findActiveOrderByUserAndResource(
       ctx.from.id,
       item.id,
     );
 
+    if (activeOrder && activeOrder.paymentStatus === 'payment_submitted') {
+      const providerName =
+        activeOrder.paymentMethod === 'cbe'
+          ? 'Commercial Bank of Ethiopia (CBE)'
+          : 'Telebirr';
+
+      const pendingMsg =
+        `📖 <b>${item.title}</b>\n\n` +
+        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+        `• <b>Order Number:</b> <code>${activeOrder.orderNumber}</code>\n` +
+        `• <b>Amount:</b> <b>${activeOrder.amount} ${activeOrder.currency || 'ETB'}</b>\n` +
+        `• <b>Payment Method:</b> <b>${providerName}</b>\n` +
+        `• <b>Status:</b> ⏳ <b>Payment Awaiting Verification</b>\n\n` +
+        `We have received your payment confirmation. Our ministry administration team is currently verifying the transfer.\n\n` +
+        (item.type === 'physical_book'
+          ? `📦 <b>As soon as verified on our admin console, our courier team will contact you for delivery!</b>\n\n`
+          : `📥 <b>As soon as verified on our admin console, your e-book will be automatically delivered directly to you right here in this chat!</b>\n\n`) +
+        `<i>Tip: You may reply to this chat with your transaction reference number or bank SMS to help our team verify even faster.</i>`;
+
+      await ctx.replyWithHTML(
+        pendingMsg,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Refresh Status', `res_view_${item.id}`)],
+          [Markup.button.callback('🔙 Back to List', `res_cat_${catType}`)],
+          [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+        ]),
+      );
+      return;
+    }
+
+    // 3. Resource is PAID and user needs to pay:
+    // Create/reuse pending order and display Telebirr and CBE accounts
+    let order = activeOrder && activeOrder.paymentStatus === 'pending' ? activeOrder : null;
     if (!order) {
       const client = await this.clientsService.findByTelegramId(ctx.from.id);
       order = await this.resourcesService.createResourceOrder({
@@ -619,6 +674,8 @@ export class BotUpdate {
         phone: client?.phone || undefined,
       });
     }
+
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
 
     const paymentMsg = this.botService.getPaymentInstructionsMessage(
       item.title,
@@ -655,34 +712,41 @@ export class BotUpdate {
       return;
     }
 
-    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
+    const isPaid = item.pricingType ? item.pricingType === 'paid' && Number(item.price) > 0 : (!!item.isPaid && Number(item.price) > 0);
+    const isFree = !isPaid;
     const hasAccess = isFree || (await this.resourcesService.hasAccess(ctx.from.id, String(item.id)));
 
     if (!hasAccess) {
       await ctx.replyWithHTML('🔒 Purchase is required to download this resource.');
+      return this.onResView(ctx);
+    }
+
+    if (item.type === 'physical_book') {
+      await ctx.replyWithHTML('📦 This is a physical paperback book delivered by courier. Our team is managing fulfillment.');
       return;
     }
 
-    if (item.filePath) {
-      await ctx.replyWithHTML('⏳ <i>Sending document to your chat...</i>');
-      try {
-        await this.botService.sendDocumentToUser(
-          ctx.from.id,
-          item.filePath,
-          item.fileName || `${item.title}.pdf`,
-          `📖 <b>${item.title}</b>\nGod bless your journey to purity!`,
-        );
-      } catch (err) {
-        await ctx.replyWithHTML(
-          '⚠️ Could not send document directly. Please contact our support team or check back shortly.',
+    await ctx.replyWithHTML('⏳ <i>Sending document to your chat...</i>');
+    try {
+      let filePath = item.filePath;
+      if (!filePath) {
+        filePath = path.resolve(
+          process.cwd(),
+          'uploads/resources/ebooks',
+          `${(item.title || 'resource').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
         );
       }
-    } else if (item.downloadUrl) {
-      await ctx.replyWithHTML(
-        `📥 <b>Download Link:</b>\n<a href="${item.downloadUrl}">Click here to open ${item.title}</a>`,
+      await this.botService.sendDocumentToUser(
+        ctx.from.id,
+        filePath,
+        item.fileName || `${item.title}.pdf`,
+        `📖 <b>${item.title}</b>\nGod bless your journey to purity!`,
       );
-    } else {
-      await ctx.replyWithHTML('ℹ️ Document file will be delivered by our pastoral team.');
+    } catch (err: any) {
+      this.logger.error(`Error sending document to ${ctx.from.id}: ${err?.message}`, err);
+      await ctx.replyWithHTML(
+        '⚠️ Could not send document directly. Please contact our support team or check back shortly.',
+      );
     }
   }
 
@@ -749,17 +813,23 @@ export class BotUpdate {
     if (purchases.length === 0) {
       await ctx.replyWithHTML(
         '💼 You have no purchased e-books yet. Browse the catalog to explore available materials.',
-        this.botService.getServicesMenuKeyboard(),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📱 Browse Digital E-Books', 'res_cat_ebook')],
+          [Markup.button.callback('🔙 Back to Formats', 'srv_resources')],
+        ]),
       );
       return;
     }
 
+    const buttons: any[] = [];
     let msg = '💼 <b>My Purchased E-Books & Materials:</b>\n\n';
     for (const p of purchases) {
       msg += `• <b>${p.resourceTitle}</b>\n  Status: ✅ Verified & Accessible\n\n`;
+      buttons.push([Markup.button.callback(`📥 Download: ${p.resourceTitle}`, `res_dl_${p.resourceId}`)]);
     }
+    buttons.push([Markup.button.callback('🔙 Back to Formats', 'srv_resources')]);
 
-    await ctx.replyWithHTML(msg, this.botService.getServicesMenuKeyboard());
+    await ctx.replyWithHTML(msg, Markup.inlineKeyboard(buttons));
   }
 
   // ==========================================
