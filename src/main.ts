@@ -23,6 +23,21 @@ async function bootstrap() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Strict anti-caching middleware for dynamic API endpoints.
+  // Overrides upstream proxy defaults (e.g. cPanel LiteSpeed/Apache public, max-age=2592000).
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/uploads/')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+      res.setHeader('X-LiteSpeed-Cache-Control', 'no-cache');
+    }
+    next();
+  });
+
   const rawAllowedOrigins = [
     'https://anonymous.puritymattersethiopia.com',
     'https://app.puritymattersethiopia.com',
