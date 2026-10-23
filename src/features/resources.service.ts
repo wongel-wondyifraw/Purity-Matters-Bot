@@ -79,84 +79,88 @@ export class ResourcesService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    try {
-      const count = await this.resourceRepo.count();
-      if (count === 0) {
-        this.logger.log('Seeding initial Resources into database...');
-        await this.resourceRepo.save([
-          {
-            title: '🛡️ Daily Purity Battle Guide (PDF)',
-            author: 'Pastoral Care Team',
-            description:
-              'Essential practical disciplines, morning declarations, and scripture-rooted mind renewal tools for daily victory.',
-            type: 'ebook' as ResourceType,
-            pricingType: 'free' as PricingType,
-            price: 0,
-            currency: 'ETB',
-            filePath: '/uploads/resources/ebooks/daily-purity-battle-guide.pdf',
-            fileName: 'daily-purity-battle-guide.pdf',
-            fileSizeBytes: 2450000,
-            fileMimeType: 'application/pdf',
-            stockQuantity: null,
-            coverImageUrl: null,
-            isActive: true,
-          },
-          {
-            title: '📖 Breaking Chains: The Wholeness Journey',
-            author: 'Dr. Selamawit & Team',
-            description:
-              'A deep-dive handbook tackling neurological habit loops, emotional triggers, and sustained spiritual freedom.',
-            type: 'ebook' as ResourceType,
-            pricingType: 'paid' as PricingType,
-            price: 250,
-            currency: 'ETB',
-            filePath: '/uploads/resources/ebooks/breaking-chains-ebook.pdf',
-            fileName: 'breaking-chains-ebook.pdf',
-            fileSizeBytes: 5800000,
-            fileMimeType: 'application/pdf',
-            stockQuantity: null,
-            coverImageUrl: null,
-            isActive: true,
-          },
-          {
-            title: '🕊️ Healing Father & Mother Wounds (Physical Paperback)',
-            author: 'Pastor Daniel & Dr. Selamawit',
-            description:
-              'Printed physical copy addressing identity restoration, breaking rejection patterns, and deep healing.',
-            type: 'physical_book' as ResourceType,
-            pricingType: 'paid' as PricingType,
-            price: 350,
-            currency: 'ETB',
-            filePath: null,
-            fileName: null,
-            fileSizeBytes: null,
-            fileMimeType: null,
-            stockQuantity: 85,
-            coverImageUrl: null,
-            isActive: true,
-          },
-          {
-            title: '🌱 40 Days to Clean Hands & Pure Heart (Physical Devotional)',
-            author: 'Purity Matters Ministry',
-            description:
-              'Deluxe physical journal with 40 daily readings, trigger reflection templates, and prayer declarations.',
-            type: 'physical_book' as ResourceType,
-            pricingType: 'paid' as PricingType,
-            price: 450,
-            currency: 'ETB',
-            filePath: null,
-            fileName: null,
-            fileSizeBytes: null,
-            fileMimeType: null,
-            stockQuantity: 120,
-            coverImageUrl: null,
-            isActive: true,
-          },
-        ]);
-        this.logger.log('Initial resources successfully seeded.');
+    // Automatic re-seeding disabled to prevent sample resources from regenerating when deleted.
+    // To explicitly seed sample resources, set SEED_SAMPLE_RESOURCES=true in .env.
+    if (process.env.SEED_SAMPLE_RESOURCES === 'true') {
+      try {
+        const count = await this.resourceRepo.count();
+        if (count === 0) {
+          this.logger.log('SEED_SAMPLE_RESOURCES=true: Seeding initial Resources into database...');
+          await this.resourceRepo.save([
+            {
+              title: '🛡️ Daily Purity Battle Guide (PDF)',
+              author: 'Pastoral Care Team',
+              description:
+                'Essential practical disciplines, morning declarations, and scripture-rooted mind renewal tools for daily victory.',
+              type: 'ebook' as ResourceType,
+              pricingType: 'free' as PricingType,
+              price: 0,
+              currency: 'ETB',
+              filePath: '/uploads/resources/ebooks/daily-purity-battle-guide.pdf',
+              fileName: 'daily-purity-battle-guide.pdf',
+              fileSizeBytes: 2450000,
+              fileMimeType: 'application/pdf',
+              stockQuantity: null,
+              coverImageUrl: null,
+              isActive: true,
+            },
+            {
+              title: '📖 Breaking Chains: The Wholeness Journey',
+              author: 'Dr. Selamawit & Team',
+              description:
+                'A deep-dive handbook tackling neurological habit loops, emotional triggers, and sustained spiritual freedom.',
+              type: 'ebook' as ResourceType,
+              pricingType: 'paid' as PricingType,
+              price: 250,
+              currency: 'ETB',
+              filePath: '/uploads/resources/ebooks/breaking-chains-ebook.pdf',
+              fileName: 'breaking-chains-ebook.pdf',
+              fileSizeBytes: 5800000,
+              fileMimeType: 'application/pdf',
+              stockQuantity: null,
+              coverImageUrl: null,
+              isActive: true,
+            },
+            {
+              title: '🕊️ Healing Father & Mother Wounds (Physical Paperback)',
+              author: 'Pastor Daniel & Dr. Selamawit',
+              description:
+                'Printed physical copy addressing identity restoration, breaking rejection patterns, and deep healing.',
+              type: 'physical_book' as ResourceType,
+              pricingType: 'paid' as PricingType,
+              price: 350,
+              currency: 'ETB',
+              filePath: null,
+              fileName: null,
+              fileSizeBytes: null,
+              fileMimeType: null,
+              stockQuantity: 85,
+              coverImageUrl: null,
+              isActive: true,
+            },
+            {
+              title: '🌱 40 Days to Clean Hands & Pure Heart (Physical Devotional)',
+              author: 'Purity Matters Ministry',
+              description:
+                'Deluxe physical journal with 40 daily readings, trigger reflection templates, and prayer declarations.',
+              type: 'physical_book' as ResourceType,
+              pricingType: 'paid' as PricingType,
+              price: 450,
+              currency: 'ETB',
+              filePath: null,
+              fileName: null,
+              fileSizeBytes: null,
+              fileMimeType: null,
+              stockQuantity: 120,
+              coverImageUrl: null,
+              isActive: true,
+            },
+          ]);
+          this.logger.log('Initial resources successfully seeded.');
+        }
+      } catch (err) {
+        this.logger.warn('Resource seed skipped or deferred', err);
       }
-    } catch (err) {
-      this.logger.warn('Resource seed skipped or deferred', err);
     }
   }
 
