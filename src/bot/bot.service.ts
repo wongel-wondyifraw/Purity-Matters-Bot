@@ -39,6 +39,45 @@ export function generateValidPdfBuffer(title: string, author?: string): Buffer {
   return Buffer.from(fullPdf, 'utf-8');
 }
 
+/**
+ * Resolves a resource file path to an absolute path on the local disk.
+ * Handles:
+ * - Stored DB/web paths starting with '/uploads/resources/ebooks/...' or 'uploads/...'
+ * - Linux POSIX root conflict (path.isAbsolute('/uploads') evaluates to true on Linux, which throws EACCES when calling mkdir)
+ * - Already fully resolved paths under process.cwd() or valid absolute disk paths
+ * - Fallback filenames if filePath is empty/null/undefined
+ */
+export function resolveUploadDiskPath(
+  filePath?: string | null,
+  fallbackFilename?: string,
+): string {
+  const defaultDir = path.resolve(process.cwd(), 'uploads/resources/ebooks');
+  if (!filePath || !filePath.trim()) {
+    const filename = fallbackFilename
+      ? fallbackFilename.replace(/[^a-zA-Z0-9_.-]/g, '_')
+      : 'resource.pdf';
+    return path.resolve(defaultDir, filename);
+  }
+
+  const trimmed = filePath.trim();
+
+  // If it's already an absolute path pointing within process.cwd()
+  if (trimmed.startsWith(process.cwd())) {
+    return trimmed;
+  }
+
+  // If it's an existing absolute path on disk outside process.cwd()
+  if (path.isAbsolute(trimmed) && fs.existsSync(trimmed)) {
+    return trimmed;
+  }
+
+  // Web routes / stored DB paths commonly start with '/uploads/' or 'uploads/'
+  // On POSIX (Linux/macOS), '/uploads/...' is treated as absolute to root '/', which fails with EACCES.
+  // We strip any leading slashes and resolve relative to process.cwd().
+  const relativePart = trimmed.replace(/^[/\\]+/, '');
+  return path.resolve(process.cwd(), relativePart);
+}
+
 @Injectable()
 export class BotService {
   private readonly logger = new Logger(BotService.name);
@@ -60,15 +99,18 @@ export class BotService {
         return false;
       }
 
-      const fullDiskPath = path.isAbsolute(filePath)
-        ? filePath
-        : path.resolve(
-            process.cwd(),
-            filePath.startsWith('/') ? filePath.slice(1) : filePath,
-          );
+      const fullDiskPath = resolveUploadDiskPath(filePath, fileName);
 
       // If file does not exist on disk, or is empty / too small, generate clean valid PDF
-      const needsGeneration = !fs.existsSync(fullDiskPath) || fs.statSync(fullDiskPath).size < 100;
+      let needsGeneration = true;
+      try {
+        if (fs.existsSync(fullDiskPath) && fs.statSync(fullDiskPath).size >= 100) {
+          needsGeneration = false;
+        }
+      } catch {
+        needsGeneration = true;
+      }
+
       if (needsGeneration) {
         this.logger.warn(`Generating clean valid PDF document at ${fullDiskPath}`);
         fs.mkdirSync(path.dirname(fullDiskPath), { recursive: true });

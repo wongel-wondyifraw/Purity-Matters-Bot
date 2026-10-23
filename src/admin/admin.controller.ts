@@ -24,7 +24,7 @@ import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
-import { BotService, generateValidPdfBuffer } from '../bot/bot.service.js';
+import { BotService, generateValidPdfBuffer, resolveUploadDiskPath } from '../bot/bot.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
 
@@ -523,19 +523,22 @@ export class AdminController {
     // If resource is an e-book or digital file, automatically dispatch document to user via Telegram Bot!
     if (order.resourceType === 'ebook' || (resource && resource.type === 'ebook') || (resource && resource.filePath)) {
       try {
-        let fullDiskPath = resource?.filePath
-          ? path.isAbsolute(resource.filePath)
-            ? resource.filePath
-            : path.resolve(
-                process.cwd(),
-                resource.filePath.startsWith('/')
-                  ? resource.filePath.slice(1)
-                  : resource.filePath,
-              )
-          : path.resolve(process.cwd(), 'uploads/resources/ebooks', `${order.resourceTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+        const fullDiskPath = resolveUploadDiskPath(
+          resource?.filePath,
+          resource?.fileName || `${order.resourceTitle}.pdf`,
+        );
 
         // If file does not exist on disk, auto-create a clean valid PDF document so dispatch NEVER fails!
-        if (!fs.existsSync(fullDiskPath) || fs.statSync(fullDiskPath).size < 100) {
+        let needsGeneration = true;
+        try {
+          if (fs.existsSync(fullDiskPath) && fs.statSync(fullDiskPath).size >= 100) {
+            needsGeneration = false;
+          }
+        } catch {
+          needsGeneration = true;
+        }
+
+        if (needsGeneration) {
           fs.mkdirSync(path.dirname(fullDiskPath), { recursive: true });
           const cleanTitle = (resource?.title || order.resourceTitle);
           fs.writeFileSync(fullDiskPath, generateValidPdfBuffer(cleanTitle, resource?.author || undefined));

@@ -3,7 +3,7 @@ import { Update, Ctx, Start, Help, Command, Action, On, Hears } from 'nestjs-tel
 import { Markup } from 'telegraf';
 import * as path from 'path';
 import type { BotContext } from './bot.interface.js';
-import { BotService } from './bot.service.js';
+import { BotService, resolveUploadDiskPath } from './bot.service.js';
 import { ClientsService } from '../clients/clients.service.js';
 import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
@@ -775,17 +775,13 @@ export class BotUpdate {
 
     await ctx.replyWithHTML('⏳ <i>Sending document to your chat...</i>');
     try {
-      let filePath = item.filePath;
-      if (!filePath) {
-        filePath = path.resolve(
-          process.cwd(),
-          'uploads/resources/ebooks',
-          `${(item.title || 'resource').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
-        );
-      }
+      const fullDiskPath = resolveUploadDiskPath(
+        item.filePath,
+        item.fileName || `${(item.title || 'resource').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+      );
       await this.botService.sendDocumentToUser(
         ctx.from.id,
-        filePath,
+        fullDiskPath,
         item.fileName || `${item.title}.pdf`,
         `📖 <b>${item.title}</b>\nGod bless your journey to purity!`,
       );
