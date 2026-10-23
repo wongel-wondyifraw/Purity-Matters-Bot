@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Update, Ctx, Start, Help, Command, Action, On, Hears } from 'nestjs-telegraf';
+import { Markup } from 'telegraf';
 import type { BotContext } from './bot.interface.js';
 import { BotService } from './bot.service.js';
 import { ClientsService } from '../clients/clients.service.js';
@@ -503,21 +504,61 @@ export class BotUpdate {
   // D. RESOURCES & E-BOOKS FLOW (Telebirr & CBE)
   // ==========================================
   @Action('srv_resources')
-  @Hears(['📖 D. Resources & E-Books', '📖 Resources'])
+  @Hears(['📖 D. Resources & E-Books', '📖 Resources', '/resources'])
   async onSrvResources(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
     }
 
-    const dbResources = await this.resourcesService.findAllResources();
-    const catalog = dbResources.length > 0 ? dbResources : this.resourcesService.getCatalog();
+    await ctx.replyWithHTML(
+      '📖 <b>Ministry Resources & Publications</b>\n\n' +
+        'Welcome to Purity Matters Resources. Please select the format you would like to explore:\n\n' +
+        '📱 <b>Digital E-Books:</b> Instant digital guides, workbooks, and devotional PDFs\n' +
+        '📦 <b>Physical Books:</b> Printed paperback publications delivered by courier',
+      this.botService.getResourceFormatsKeyboard(),
+    );
+  }
+
+  @Action('res_cat_ebook')
+  async onResCatEbook(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const dbResources = await this.resourcesService.findAllResources({ type: 'ebook' });
+    const ebooks = dbResources.length > 0 ? dbResources : this.resourcesService.getCatalog().filter((i) => i.category !== 'devotional');
 
     await ctx.replyWithHTML(
-      '📖 <b>Ministry Resources & E-Books Catalog</b>\n\n' +
-        'Explore our collection of purity workbooks, guides, and transformative e-books.\n' +
-        'Free materials can be downloaded immediately, while paid resources support Telebirr and CBE bank transfers:',
-      this.botService.getResourcesMenuKeyboard(catalog),
+      '📱 <b>Available Digital E-Books & Guides</b>\n\n' +
+        'Select a publication below to view details and download or purchase:',
+      this.botService.getResourceCategoryKeyboard(ebooks, 'ebook'),
+    );
+  }
+
+  @Action('res_cat_physical')
+  async onResCatPhysical(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const dbResources = await this.resourcesService.findAllResources({ type: 'physical_book' });
+    const physical = dbResources.length > 0 ? dbResources : this.resourcesService.getCatalog().filter((i) => (i as any).type === 'physical_book');
+
+    if (physical.length === 0) {
+      await ctx.replyWithHTML(
+        '📦 <b>Physical Print Publications</b>\n\n' +
+          'No physical paperback books are currently in stock. Please browse our digital e-books for instant access.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📱 Browse Digital E-Books', 'res_cat_ebook')],
+          [Markup.button.callback('🔙 Back to Formats', 'srv_resources')],
+        ]),
+      );
+      return;
+    }
+
+    await ctx.replyWithHTML(
+      '📦 <b>Available Physical Books & Devotionals</b>\n\n' +
+        'Select a publication below to view details and place an order:',
+      this.botService.getResourceCategoryKeyboard(physical, 'physical_book'),
     );
   }
 
@@ -542,22 +583,56 @@ export class BotUpdate {
 
     const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
     const hasAccess = isFree || (await this.resourcesService.hasAccess(ctx.from.id, String(item.id)));
+    const catType = item.type === 'physical_book' ? 'physical' : 'ebook';
 
-    const priceText = isFree ? 'FREE' : `${item.price} ${item.currency || 'ETB'}`;
-    const statusText = hasAccess
-      ? '✅ Available for Download'
-      : '🔒 Purchase Required (Telebirr / CBE)';
+    if (isFree || hasAccess) {
+      const message =
+        `📖 <b>${item.title}</b>\n\n` +
+        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+        `• <b>Access:</b> ✅ Available for Immediate Download (FREE)\n\n` +
+        `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}`;
 
-    const message =
-      `<b>${item.title}</b>\n\n` +
-      `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-      `• <b>Price:</b> <b>${priceText}</b>\n` +
-      `• <b>Access:</b> ${statusText}\n\n` +
-      `📝 <b>Overview:</b>\n${item.description || 'No description provided.'}`;
+      await ctx.replyWithHTML(
+        message,
+        this.botService.getResourceFreeKeyboard(item.id, catType),
+      );
+      return;
+    }
+
+    // ==========================================
+    // PAID RESOURCE: Directly display account numbers & "I Have Paid" button
+    // ==========================================
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    let order = await this.resourcesService.findPendingOrderByUserAndResource(
+      ctx.from.id,
+      item.id,
+    );
+
+    if (!order) {
+      const client = await this.clientsService.findByTelegramId(ctx.from.id);
+      order = await this.resourcesService.createResourceOrder({
+        resourceId: item.id,
+        telegramId: ctx.from.id,
+        clientName: client?.fullName || ctx.from.first_name || 'Client',
+        username: ctx.from.username,
+        phone: client?.phone || undefined,
+      });
+    }
+
+    const paymentMsg = this.botService.getPaymentInstructionsMessage(
+      item.title,
+      item.price,
+      item.currency || 'ETB',
+      order.orderNumber,
+      accounts,
+      item.description,
+      item.author,
+    );
 
     await ctx.replyWithHTML(
-      message,
-      this.botService.getResourceDetailKeyboard(item, hasAccess),
+      paymentMsg,
+      this.botService.getPaidResourceActionKeyboard(order.id, catType),
     );
   }
 
@@ -613,56 +688,8 @@ export class BotUpdate {
 
   @Action(/^res_buy_(.+)$/)
   async onResBuy(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    await ctx.answerCbQuery();
-
-    const rawId = (ctx as any).match[1];
-    let item: any = null;
-
-    if (!isNaN(Number(rawId))) {
-      item = await this.resourcesService.findResourceById(Number(rawId));
-    }
-    if (!item) {
-      item = this.resourcesService.getResource(rawId);
-    }
-    if (!item) return;
-
-    const isFree = item.pricingType === 'free' || item.isPaid === false || Number(item.price) === 0;
-    if (isFree) {
-      await this.resourcesService.grantAccess(ctx.from.id, String(item.id));
-      await ctx.replyWithHTML('🎉 This resource is free! Tap below to download:', this.botService.getResourceDetailKeyboard(item, true));
-      return;
-    }
-
-    // Get live Telebirr & CBE account settings
-    const accounts = await this.paymentSettingsService.getFormattedAccounts();
-
-    // Check if client has a pending order for this resource or create new order
-    let order = await this.resourcesService.findPendingOrderByUserAndResource(
-      ctx.from.id,
-      item.id,
-    );
-
-    if (!order) {
-      const client = await this.clientsService.findByTelegramId(ctx.from.id);
-      order = await this.resourcesService.createResourceOrder({
-        resourceId: item.id,
-        telegramId: ctx.from.id,
-        clientName: client?.fullName || ctx.from.first_name || 'Client',
-        username: ctx.from.username,
-        phone: client?.phone || undefined,
-      });
-    }
-
-    const instructionsMsg = this.botService.getPaymentInstructionsMessage(
-      item.title,
-      item.price,
-      item.currency || 'ETB',
-      order.orderNumber,
-      accounts,
-    );
-
-    await ctx.replyWithHTML(instructionsMsg, this.botService.getPaymentActionKeyboard(order.id));
+    // Forward directly to onResView which handles order creation and payment accounts display
+    return this.onResView(ctx);
   }
 
   @Action(/^pay_confirm_(\d+)_(telebirr|cbe)$/)
@@ -682,12 +709,17 @@ export class BotUpdate {
     const providerName = method === 'telebirr' ? 'Telebirr' : 'Commercial Bank of Ethiopia (CBE)';
 
     await ctx.replyWithHTML(
-      `✅ <b>Payment Confirmation Received!</b>\n\n` +
-        `Your order <code>${order.orderNumber}</code> for <b>${order.resourceTitle}</b> has been submitted as <b>Paid via ${providerName}</b>.\n\n` +
-        `Our ministry team has received your order and is verifying the transfer.\n\n` +
-        `<b>As soon as confirmed by our admin console, your resource will be automatically sent right here in this chat!</b>\n\n` +
-        `<i>Tip: You can reply to this message with your Transaction Reference number (or copy-paste your bank SMS) to help our team verify even faster.</i>`,
-      this.botService.getServicesMenuKeyboard(),
+      `⏳ <b>Payment Confirmation Received!</b>\n\n` +
+        `Order Number: <code>${order.orderNumber}</code>\n` +
+        `Resource: <b>${order.resourceTitle}</b>\n` +
+        `Payment Method: <b>${providerName}</b>\n\n` +
+        `<b>Please wait while our administration team verifies your payment.</b>\n\n` +
+        `📥 <b>As soon as confirmed on our admin console, your resource will be automatically delivered directly to you right here in this chat!</b>\n\n` +
+        `<i>Tip: You may reply to this chat with your transaction reference number or bank SMS to help our team verify even faster.</i>`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+        [Markup.button.callback('📖 Browse Other Resources', 'srv_resources')],
+      ]),
     );
   }
 
@@ -701,7 +733,10 @@ export class BotUpdate {
 
     await ctx.replyWithHTML(
       '❌ <b>Order Cancelled</b>\n\nYou can browse our resources anytime using the button below:',
-      this.botService.getServicesMenuKeyboard(),
+      Markup.inlineKeyboard([
+        [Markup.button.callback('📖 Browse Resources', 'srv_resources')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+      ]),
     );
   }
 

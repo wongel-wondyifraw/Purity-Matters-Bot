@@ -262,42 +262,64 @@ export class BotService {
   }
 
   // --- D. Resources & E-Books Keyboards ---
-  getResourcesMenuKeyboard(catalog: any[]) {
-    const buttons = catalog.map((item) => {
-      const isPaid = item.pricingType ? item.pricingType === 'paid' : !!item.isPaid;
+  getResourceFormatsKeyboard() {
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('📱 Digital E-Books', 'res_cat_ebook')],
+      [Markup.button.callback('📦 Physical Books', 'res_cat_physical')],
+      [Markup.button.callback('💼 My Purchases', 'res_my_purchases')],
+      [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
+    ]);
+  }
+
+  getResourceCategoryKeyboard(items: any[], categoryType: 'ebook' | 'physical_book' = 'ebook') {
+    const buttons = items.map((item) => {
+      const isPaid = item.pricingType ? item.pricingType === 'paid' : (Number(item.price) > 0 || !!item.isPaid);
       const priceText = isPaid ? `(${item.price} ${item.currency || 'ETB'})` : '(FREE)';
+      const icon = categoryType === 'physical_book' ? '📦' : '📖';
       return [
         Markup.button.callback(
-          `${item.title} ${priceText}`,
+          `${icon} ${item.title} ${priceText}`,
           `res_view_${item.id}`,
         ),
       ];
     });
-    buttons.push([Markup.button.callback('💼 My Purchases', 'res_my_purchases')]);
-    buttons.push([Markup.button.callback('🔙 Return to Services', 'cmd_services')]);
+    buttons.push([Markup.button.callback('🔙 Back to Formats', 'srv_resources')]);
     return Markup.inlineKeyboard(buttons);
   }
 
+  getResourcesMenuKeyboard(catalog: any[]) {
+    return this.getResourceFormatsKeyboard();
+  }
+
+  getResourceFreeKeyboard(resourceId: number | string, categoryType: string = 'ebook') {
+    return Markup.inlineKeyboard([
+      [Markup.button.callback('📥 Download / Receive Free', `res_dl_${resourceId}`)],
+      [Markup.button.callback('🔙 Back to List', `res_cat_${categoryType}`)],
+    ]);
+  }
+
+  getPaidResourceActionKeyboard(orderId: number, categoryType: string = 'ebook') {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ I Have Paid (Telebirr)', `pay_confirm_${orderId}_telebirr`),
+        Markup.button.callback('✅ I Have Paid (CBE)', `pay_confirm_${orderId}_cbe`),
+      ],
+      [Markup.button.callback('❌ Cancel Order', `pay_cancel_${orderId}`)],
+      [Markup.button.callback('🔙 Back to List', `res_cat_${categoryType}`)],
+    ]);
+  }
+
   getResourceDetailKeyboard(resource: any, hasPurchased: boolean) {
-    const buttons: any[] = [];
     const isFree = resource.pricingType === 'free' || resource.isPaid === false || Number(resource.price) === 0;
+    const cat = resource.type === 'physical_book' ? 'physical' : 'ebook';
 
     if (isFree || hasPurchased) {
-      buttons.push([
-        Markup.button.callback('📥 Download / Receive File', `res_dl_${resource.id}`),
-      ]);
-    } else {
-      const price = resource.price || 250;
-      const currency = resource.currency || 'ETB';
-      buttons.push([
-        Markup.button.callback(
-          `💳 Purchase (${price} ${currency})`,
-          `res_buy_${resource.id}`,
-        ),
-      ]);
+      return this.getResourceFreeKeyboard(resource.id, cat);
     }
-    buttons.push([Markup.button.callback('🔙 Back to Catalog', 'srv_resources')]);
-    return Markup.inlineKeyboard(buttons);
+    return Markup.inlineKeyboard([
+      [Markup.button.callback(`💳 Pay & Order (${resource.price || 250} ${resource.currency || 'ETB'})`, `res_view_${resource.id}`)],
+      [Markup.button.callback('🔙 Back to List', `res_cat_${cat}`)],
+    ]);
   }
 
   getPaymentInstructionsMessage(
@@ -306,26 +328,38 @@ export class BotService {
     currency: string,
     orderNumber: string,
     accounts: PaymentAccountsResponse,
+    resourceDescription?: string,
+    author?: string,
   ): string {
-    let msg = `💳 <b>Payment Required for:</b>\n<b>${resourceTitle}</b>\n\n`;
-    msg += `💰 <b>Amount:</b> <b>${amount} ${currency}</b>\n`;
-    msg += `🔖 <b>Order Reference:</b> <code>${orderNumber}</code> <i>(tap to copy)</i>\n\n`;
-    msg += `Please transfer <b>${amount} ${currency}</b> using either account below, putting <code>${orderNumber}</code> in the transfer reason/remarks:\n\n`;
+    let msg = `📖 <b>${resourceTitle}</b>\n`;
+    if (author) {
+      msg += `• <b>Author:</b> ${author}\n`;
+    }
+    msg += `• <b>Price:</b> <b>${amount} ${currency}</b>\n\n`;
 
-    if (accounts.telebirr.isActive) {
+    if (resourceDescription) {
+      msg += `📝 <b>Overview:</b>\n${resourceDescription}\n\n`;
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `💳 <b>PAYMENT DETAILS (Telebirr & CBE)</b>\n\n`;
+    msg += `Please transfer <b>${amount} ${currency}</b> using either account below:\n`;
+    msg += `🔖 <b>Order Reference:</b> <code>${orderNumber}</code> <i>(tap to copy)</i>\n\n`;
+
+    if (accounts.telebirr && accounts.telebirr.isActive) {
       msg += `📱 <b>Telebirr:</b>\n`;
       msg += `• Account: <code>${accounts.telebirr.accountNumber}</code> <i>(tap to copy)</i>\n`;
-      msg += `• Receiver: <b>${accounts.telebirr.accountName}</b>\n`;
+      msg += `• Name: <b>${accounts.telebirr.accountName}</b>\n`;
       if (accounts.telebirr.instructions) {
         msg += `• Note: <i>${accounts.telebirr.instructions}</i>\n`;
       }
       msg += `\n`;
     }
 
-    if (accounts.cbe.isActive) {
+    if (accounts.cbe && accounts.cbe.isActive) {
       msg += `🏦 <b>Commercial Bank of Ethiopia (CBE):</b>\n`;
       msg += `• Account: <code>${accounts.cbe.accountNumber}</code> <i>(tap to copy)</i>\n`;
-      msg += `• Receiver: <b>${accounts.cbe.accountName}</b>\n`;
+      msg += `• Name: <b>${accounts.cbe.accountName}</b>\n`;
       if (accounts.cbe.branchOrShortcode) {
         msg += `• Branch: ${accounts.cbe.branchOrShortcode}\n`;
       }
@@ -340,13 +374,7 @@ export class BotService {
   }
 
   getPaymentActionKeyboard(orderId: number) {
-    return Markup.inlineKeyboard([
-      [
-        Markup.button.callback('📱 Paid via Telebirr', `pay_confirm_${orderId}_telebirr`),
-        Markup.button.callback('🏦 Paid via CBE', `pay_confirm_${orderId}_cbe`),
-      ],
-      [Markup.button.callback('❌ Cancel Order', `pay_cancel_${orderId}`)],
-    ]);
+    return this.getPaidResourceActionKeyboard(orderId);
   }
 
   getPhoneShareKeyboard() {
