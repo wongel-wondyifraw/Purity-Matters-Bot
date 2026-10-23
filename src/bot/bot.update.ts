@@ -675,44 +675,8 @@ export class BotUpdate {
       return;
     }
 
-    // 3. Resource is PAID: check if user already purchased and verified in the past
-    const hasAccess = await this.resourcesService.hasAccess(ctx.from.id, String(item.id));
-
-    if (hasAccess) {
-      if (item.type === 'physical_book') {
-        const message =
-          `📦 <b>${item.title}</b>\n\n` +
-          `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-          `• <b>Price:</b> <b>${item.price} ${item.currency || 'ETB'}</b>\n` +
-          `• <b>Status:</b> ✅ <b>Previous Order Verified</b>\n\n` +
-          `📝 <b>Overview:</b>\n${item.description || 'Ministry physical publication.'}\n\n` +
-          `📦 <i>Our fulfillment team manages courier delivery for your previous verified order. Would you like to order another print copy?</i>`;
-
-        await ctx.replyWithHTML(
-          message,
-          this.botService.getResourcePurchasedKeyboard(item, catType),
-        );
-        return;
-      }
-
-      // Digital E-Book (Previously Purchased)
-      const message =
-        `📖 <b>${item.title}</b>\n\n` +
-        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-        `• <b>Price:</b> <b>${item.price} ${item.currency || 'ETB'}</b>\n` +
-        `• <b>Access:</b> ✅ <b>Purchased & Verified</b>\n\n` +
-        `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}\n\n` +
-        `✨ <i>You already own this publication! You can download it directly below anytime, or purchase another separate copy/gift for someone else.</i>`;
-
-      await ctx.replyWithHTML(
-        message,
-        this.botService.getResourcePurchasedKeyboard(item, catType),
-      );
-      return;
-    }
-
-    // 4. Resource is PAID and client is purchasing for the first time:
-    // Create new pending order and display payment accounts
+    // 3. Resource is PAID: proceed with normal buying process even if previously purchased.
+    // Previous verified purchases and downloads remain accessible under "My Orders & Purchases".
     const client = await this.clientsService.findByTelegramId(ctx.from.id);
     const order = await this.resourcesService.createResourceOrder({
       resourceId: item.id,
@@ -924,30 +888,72 @@ export class BotUpdate {
     );
   }
 
-  @Action('res_my_purchases')
+  @Action(['res_my_purchases', 'res_my_orders'])
+  @Command(['orders', 'myorders'])
   async onResPurchases(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
-    await ctx.answerCbQuery();
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
 
-    const purchases = await this.resourcesService.getMyPurchases(ctx.from.id);
-    if (purchases.length === 0) {
+    const [purchases, orders] = await Promise.all([
+      this.resourcesService.getMyPurchases(ctx.from.id),
+      this.resourcesService.findOrdersByTelegramId(ctx.from.id),
+    ]);
+
+    if (purchases.length === 0 && orders.length === 0) {
       await ctx.replyWithHTML(
-        '💼 You have no purchased e-books yet. Browse the catalog to explore available materials.',
+        '📦 <b>My Orders & Purchases</b>\n\n' +
+          'You have no orders or purchased materials yet.\n' +
+          'Browse our catalog to explore available books and e-books.',
         Markup.inlineKeyboard([
           [Markup.button.callback('📱 Browse Digital E-Books', 'res_cat_ebook')],
-          [Markup.button.callback('🔙 Back to Formats', 'srv_resources')],
+          [Markup.button.callback('📦 Browse Physical Books', 'res_cat_physical')],
+          [Markup.button.callback('🔙 Back to Catalog', 'srv_resources')],
         ]),
       );
       return;
     }
 
     const buttons: any[] = [];
-    let msg = '💼 <b>My Purchased E-Books & Materials:</b>\n\n';
-    for (const p of purchases) {
-      msg += `• <b>${p.resourceTitle}</b>\n  Status: ✅ Verified & Accessible\n\n`;
-      buttons.push([Markup.button.callback(`📥 Download: ${p.resourceTitle}`, `res_dl_${p.resourceId}`)]);
+    let msg = '📦 <b>My Orders & Purchases</b>\n\n';
+
+    if (purchases.length > 0) {
+      msg += '📖 <b>Verified Digital E-Books:</b>\n';
+      for (const p of purchases) {
+        msg += `• <b>${p.resourceTitle}</b>\n  Status: ✅ Verified & Available for Download\n\n`;
+        buttons.push([
+          Markup.button.callback(
+            `📥 Download: ${p.resourceTitle}`,
+            `res_dl_${p.resourceId}`,
+          ),
+        ]);
+      }
     }
-    buttons.push([Markup.button.callback('🔙 Back to Formats', 'srv_resources')]);
+
+    const physicalOrders = orders.filter((o) => o.resourceType === 'physical_book');
+    if (physicalOrders.length > 0) {
+      msg += '📦 <b>Physical Book Orders:</b>\n';
+      for (const po of physicalOrders) {
+        const payStatus =
+          po.paymentStatus === 'verified'
+            ? '✅ Paid & Verified'
+            : po.paymentStatus === 'payment_submitted'
+              ? '⏳ Verification Pending'
+              : '⏳ Awaiting Payment';
+        const fulfill =
+          po.fulfillmentStatus === 'delivered'
+            ? '🚀 Delivered'
+            : '📦 Courier Dispatch In Progress';
+        msg +=
+          `• <b>${po.resourceTitle}</b> (Order <code>${po.orderNumber}</code>)\n` +
+          `  Payment: ${payStatus}\n` +
+          `  Delivery: ${fulfill}\n\n`;
+      }
+    }
+
+    buttons.push([Markup.button.callback('🔙 Back to Catalog', 'srv_resources')]);
+    buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')]);
 
     await ctx.replyWithHTML(msg, Markup.inlineKeyboard(buttons));
   }

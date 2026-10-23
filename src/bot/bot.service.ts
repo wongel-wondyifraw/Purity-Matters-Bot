@@ -380,7 +380,7 @@ export class BotService {
     return Markup.inlineKeyboard([
       [Markup.button.callback('📱 Digital E-Books', 'res_cat_ebook')],
       [Markup.button.callback('📦 Physical Books', 'res_cat_physical')],
-      [Markup.button.callback('💼 My Purchases', 'res_my_purchases')],
+      [Markup.button.callback('📦 My Orders & Purchases', 'res_my_orders')],
       [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
     ]);
   }

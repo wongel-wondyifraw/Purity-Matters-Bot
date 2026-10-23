@@ -629,6 +629,15 @@ export class ResourcesService implements OnModuleInit {
     });
   }
 
+  async findOrdersByTelegramId(
+    telegramId: string | number,
+  ): Promise<ResourceOrder[]> {
+    return this.orderRepo.find({
+      where: { telegramId: String(telegramId) },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async confirmOrderPayment(
     orderId: number,
     adminNotes?: string,
