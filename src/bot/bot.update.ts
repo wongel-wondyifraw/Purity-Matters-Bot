@@ -648,9 +648,8 @@ export class BotUpdate {
         `• <b>Status:</b> ⏳ <b>Payment Awaiting Verification</b>\n\n` +
         `We have received your payment confirmation. Our ministry administration team is currently verifying the transfer.\n\n` +
         (item.type === 'physical_book'
-          ? `📦 <b>As soon as verified on our admin console, our courier team will contact you for delivery!</b>\n\n`
-          : `📥 <b>As soon as verified on our admin console, your e-book will be automatically delivered directly to you right here in this chat!</b>\n\n`) +
-        `<i>Tip: You may reply to this chat with your transaction reference number or bank SMS to help our team verify even faster.</i>`;
+          ? `📦 <b>As soon as verified on our admin console, our courier team will contact you for delivery!</b>`
+          : `📥 <b>As soon as verified on our admin console, your e-book will be automatically delivered directly to you right here in this chat!</b>`);
 
       await ctx.replyWithHTML(
         pendingMsg,
@@ -902,8 +901,7 @@ export class BotUpdate {
         `Resource: <b>${order.resourceTitle}</b>\n` +
         `Payment Method: <b>${providerName}</b>\n\n` +
         `<b>Please wait while our administration team verifies your payment.</b>\n\n` +
-        `📥 <b>As soon as confirmed on our admin console, your resource will be automatically delivered directly to you right here in this chat!</b>\n\n` +
-        `<i>Tip: You may reply to this chat with your transaction reference number or bank SMS to help our team verify even faster.</i>`,
+        `📥 <b>As soon as confirmed on our admin console, your resource will be automatically delivered directly to you right here in this chat!</b>`,
       Markup.inlineKeyboard([
         [Markup.button.callback('🔄 Refresh Status', `res_view_${order.resourceId}`)],
         [Markup.button.callback('📖 Browse Other Resources', 'srv_resources')],
