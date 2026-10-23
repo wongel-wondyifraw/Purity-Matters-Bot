@@ -198,28 +198,17 @@ export class BotService {
   getWelcomeMessage(client: Client): string {
     const name = client.fullName ?? client.firstName ?? client.username ?? 'Friend';
     return (
-      `👋 <b>Welcome, ${name}!</b> to the <b>Purity Matters Bot</b>.\n\n` +
-      `We are dedicated to helping you live a life of wholeness, freedom, and divine purpose.\n\n` +
-      `📋 <b>Your Status:</b> ${client.isRegistered ? '✅ Registered Client' : '⏳ Guest / Not Registered'}\n\n` +
-      `Use the persistent menu buttons below to explore our services or get started.`
+      `👋 <b>Welcome, ${name}!</b>\n\n` +
+      `Welcome to <b>Purity Matters</b>. We are here to support your journey to wholeness, freedom, and divine purpose.\n\n` +
+      `Please select a service below to get started:`
     );
   }
 
   // --- Sticky Bottom Persistent Keyboard ---
   getBottomPersistentKeyboard(isRegistered = false) {
-    if (isRegistered) {
-      return Markup.keyboard([
-        ['🛋️ A. Counselling', '🕊️ B. Inner Healing'],
-        ['📚 C. Training & Courses', '📖 D. Resources & E-Books'],
-        ['👤 My Profile', 'ℹ️ About Us'],
-      ])
-        .resize()
-        .persistent();
-    }
-
     return Markup.keyboard([
-      ['✨ Register as Client', 'ℹ️ About Us'],
-      ['📋 My Status', '❓ Help'],
+      ['🛋️ Counselling Request', '🕊️ Inner Healing'],
+      ['📖 Resource Request', 'ℹ️ About Us'],
     ])
       .resize()
       .persistent();

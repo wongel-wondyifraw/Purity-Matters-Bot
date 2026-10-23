@@ -26,8 +26,8 @@ export class InnerHealingRequest {
   @Column({ type: 'varchar', length: 64, nullable: true })
   phone?: string | null;
 
-  @Column({ type: 'varchar', length: 64 })
-  topic: string; // rejection, abandonment, forgiveness, shame, identity, emotional_wounds
+  @Column({ type: 'text', nullable: true })
+  topic: string; // user issue or focus topic
 
   @Column({ type: 'varchar', length: 32, default: 'pending' })
   status: string;

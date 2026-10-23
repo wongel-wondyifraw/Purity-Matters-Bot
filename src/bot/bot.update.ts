@@ -34,13 +34,6 @@ export class BotUpdate {
     const stickyKeyboard = this.botService.getBottomPersistentKeyboard(client.isRegistered);
 
     await ctx.replyWithHTML(message, stickyKeyboard);
-
-    if (client.isRegistered) {
-      await ctx.replyWithHTML(
-        this.botService.getServicesMenuMessage(),
-        this.botService.getServicesMenuKeyboard(),
-      );
-    }
   }
 
   @Help()
@@ -130,12 +123,15 @@ export class BotUpdate {
 
   @Command('about')
   @Action('cmd_about')
-  @Hears('ℹ️ About Us')
+  @Hears(['ℹ️ About Us', 'About Us'])
   async onAbout(@Ctx() ctx: BotContext) {
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
     }
-    await ctx.replyWithHTML(this.botService.getAboutMessage());
+    await ctx.replyWithHTML(
+      this.botService.getAboutMessage(),
+      this.botService.getBottomPersistentKeyboard(),
+    );
   }
 
   @Command('register')
@@ -192,23 +188,29 @@ export class BotUpdate {
 
     const phone = ctx.message.contact.phone_number;
 
+    if (client.registrationStep === 'ih_awaiting_phone') {
+      await this.clientsService.completeRegistration(client.telegramId, phone);
+      await this.clientsService.setRegistrationStep(client.telegramId, 'ih_awaiting_issue');
+
+      await ctx.replyWithHTML(
+        '🕊️ <b>Inner Healing</b>\n\n' +
+        'Please describe what you would like prayer and inner healing for.\n' +
+        '<i>(Optional — reply with a message or tap Skip below):</i>',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('⏩ Skip (General Prayer)', 'ih_skip_issue')],
+        ]),
+      );
+      return;
+    }
+
     // Complete registration with role = 'client'
     const updated = await this.clientsService.completeRegistration(client.telegramId, phone);
 
     await ctx.replyWithHTML(
-      '🎉 <b>Registration Successful!</b>\n\n' +
-      `Welcome to Purity Matters! You have been successfully registered as a client.\n\n` +
-      `• <b>Name:</b> ${updated?.fullName ?? client.firstName ?? 'Client'}\n` +
-      `• <b>Phone:</b> ${phone}\n` +
-      `• <b>Role:</b> client\n\n` +
-      `<i>You can now access all services using the sticky buttons at the bottom of your screen!</i>`,
+      '🎉 <b>Registration Complete!</b>\n\n' +
+      `Welcome to Purity Matters, <b>${updated?.fullName ?? client.firstName ?? 'Friend'}</b>!\n\n` +
+      `You can now access our services anytime using the menu below.`,
       this.botService.getBottomPersistentKeyboard(true),
-    );
-
-    // Prompt services menu with good emojis immediately after registration!
-    await ctx.replyWithHTML(
-      this.botService.getServicesMenuMessage(),
-      this.botService.getServicesMenuKeyboard(),
     );
   }
 
@@ -216,7 +218,7 @@ export class BotUpdate {
   // A. COUNSELLING FLOW
   // ==========================================
   @Action('srv_counselling')
-  @Hears(['🛋️ A. Counselling', '🛋️ Counselling'])
+  @Hears(['🛋️ Counselling Request', '🛋️ A. Counselling', '🛋️ Counselling'])
   async onSrvCounselling(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
@@ -355,7 +357,7 @@ export class BotUpdate {
       `• <b>Method:</b> ${request.preferredMethod}\n\n` +
       'Our team has received your request and will assign a counsellor shortly. ' +
       'You will receive direct notifications here when your appointment is scheduled!',
-      this.botService.getServicesMenuKeyboard(),
+      this.botService.getBottomPersistentKeyboard(),
     );
   }
 
@@ -363,25 +365,66 @@ export class BotUpdate {
   // B. INNER HEALING FLOW
   // ==========================================
   @Action('srv_inner_healing')
-  @Hears(['🕊️ B. Inner Healing', '🕊️ Inner Healing'])
+  @Hears(['🕊️ Inner Healing', '🕊️ B. Inner Healing', 'Inner Healing', '/inner_healing'])
   async onSrvInnerHealing(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
     }
 
-    const client = await this.clientsService.findByTelegramId(ctx.from.id);
-    if (!client?.isRegistered) {
-      await ctx.replyWithHTML('⚠️ Please register as a client before requesting an Inner Healing session.');
-      await this.onRegister(ctx);
-      return;
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+
+    // If client is not yet registered, start registration
+    if (!client.isRegistered) {
+      if (!client.fullName || client.fullName.length < 2) {
+        await this.clientsService.setRegistrationStep(ctx.from.id, 'ih_awaiting_name');
+        await ctx.replyWithHTML(
+          '🕊️ <b>Inner Healing Registration</b>\n\n' +
+          'Welcome! To begin, please enter your full name:',
+        );
+        return;
+      }
+
+      if (!client.phone) {
+        await this.clientsService.setRegistrationStep(ctx.from.id, 'ih_awaiting_phone');
+        await ctx.replyWithHTML(
+          `Thank you, <b>${client.fullName}</b>!\n\n` +
+          'Please share your phone number using the button below (or type it):',
+          this.botService.getPhoneShareKeyboard(),
+        );
+        return;
+      }
+
+      await this.clientsService.completeRegistration(client.telegramId, client.phone);
     }
 
+    // Client is registered: prompt for optional issue description
+    await this.clientsService.setRegistrationStep(ctx.from.id, 'ih_awaiting_issue');
     await ctx.replyWithHTML(
-      '🕊️ <b>Inner Healing Ministry</b>\n\n' +
-      'Inner Healing targets root emotional wounds, lies believed from trauma, and restores biblical identity.\n\n' +
-      'Please choose a topic below:',
-      this.botService.getInnerHealingTopicsKeyboard(),
+      '🕊️ <b>Inner Healing</b>\n\n' +
+      'Please describe what you would like prayer and inner healing for.\n' +
+      '<i>(Optional — type your response or tap Skip below):</i>',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('⏩ Skip (General Prayer)', 'ih_skip_issue')],
+      ]),
+    );
+  }
+
+  @Action('ih_skip_issue')
+  async onIhSkipIssue(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    await this.clientsService.setRegistrationStep(ctx.from.id, null);
+    const request = await this.innerHealingService.createRequest(ctx.from.id, 'General Inner Healing');
+
+    await ctx.replyWithHTML(
+      '✅ <b>Inner Healing Request Received!</b>\n\n' +
+      `• <b>Reference Code:</b> <code>${request?.referenceNumber ?? 'IH-CONFIRMED'}</code>\n` +
+      `• <b>Focus Area:</b> General Inner Healing\n\n` +
+      'Our ministry team has received your request and will communicate with you shortly regarding your session schedule.\n\n' +
+      'Our team is praying with you!',
+      this.botService.getBottomPersistentKeyboard(true),
     );
   }
 
@@ -409,7 +452,7 @@ export class BotUpdate {
       `• <b>Reference Code:</b> <code>${request?.referenceNumber ?? 'IH-CONFIRMED'}</code>\n\n` +
       '📌 <b>You will be communicated shortly regarding your session schedule and preparation instructions.</b>\n\n' +
       'Our team is praying with you.',
-      this.botService.getServicesMenuKeyboard(),
+      this.botService.getBottomPersistentKeyboard(true),
     );
   }
 
@@ -505,7 +548,7 @@ export class BotUpdate {
   // D. RESOURCES & E-BOOKS FLOW (Telebirr & CBE)
   // ==========================================
   @Action('srv_resources')
-  @Hears(['📖 D. Resources & E-Books', '📖 Resources', '/resources'])
+  @Hears(['📖 Resource Request', '📖 D. Resources & E-Books', '📖 Resources', '/resources'])
   async onSrvResources(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
@@ -513,10 +556,8 @@ export class BotUpdate {
     }
 
     await ctx.replyWithHTML(
-      '📖 <b>Ministry Resources & Publications</b>\n\n' +
-        'Welcome to Purity Matters Resources. Please select the format you would like to explore:\n\n' +
-        '📱 <b>Digital E-Books:</b> Instant digital guides, workbooks, and devotional PDFs\n' +
-        '📦 <b>Physical Books:</b> Printed paperback publications delivered by courier',
+      '📖 <b>Ministry Resources</b>\n\n' +
+        'Please select an option below:',
       this.botService.getResourceFormatsKeyboard(),
     );
   }
@@ -989,11 +1030,71 @@ export class BotUpdate {
       return;
     }
 
+    // Inner Healing Registration: Name
+    if (client.registrationStep === 'ih_awaiting_name') {
+      if (text.length < 2) {
+        await ctx.replyWithHTML('⚠️ Please enter a valid full name:');
+        return;
+      }
+
+      await this.clientsService.saveNameAndPromptPhone(client.telegramId, text);
+      await this.clientsService.setRegistrationStep(client.telegramId, 'ih_awaiting_phone');
+
+      await ctx.replyWithHTML(
+        `Thank you, <b>${text}</b>!\n\nPlease share your phone number using the button below (or type it):`,
+        this.botService.getPhoneShareKeyboard(),
+      );
+      return;
+    }
+
     // Registration step 2: prompt to use button
     if (client.registrationStep === 'awaiting_phone') {
       await ctx.replyWithHTML(
         '📱 Please click the "Share Phone Number" button below to share your verified phone number, or send /cancel to stop.',
         this.botService.getPhoneShareKeyboard(),
+      );
+      return;
+    }
+
+    // Inner Healing Registration: Phone typed as text
+    if (client.registrationStep === 'ih_awaiting_phone') {
+      const cleanPhone = text.replace(/[^0-9+]/g, '');
+      if (cleanPhone.length >= 7) {
+        await this.clientsService.completeRegistration(client.telegramId, cleanPhone);
+        await this.clientsService.setRegistrationStep(client.telegramId, 'ih_awaiting_issue');
+
+        await ctx.replyWithHTML(
+          '🕊️ <b>Inner Healing</b>\n\n' +
+          'Please describe what you would like prayer and inner healing for.\n' +
+          '<i>(Optional — type your response or tap Skip below):</i>',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('⏩ Skip (General Prayer)', 'ih_skip_issue')],
+          ]),
+        );
+        return;
+      }
+
+      await ctx.replyWithHTML(
+        '📱 Please click the "Share Phone Number" button below or type a valid phone number:',
+        this.botService.getPhoneShareKeyboard(),
+      );
+      return;
+    }
+
+    // Inner Healing: Optional Issue description
+    if (client.registrationStep === 'ih_awaiting_issue') {
+      const issueText = text.trim();
+      await this.clientsService.setRegistrationStep(client.telegramId, null);
+
+      const request = await this.innerHealingService.createRequest(client.telegramId, issueText);
+
+      await ctx.replyWithHTML(
+        '✅ <b>Inner Healing Request Received!</b>\n\n' +
+        `• <b>Reference Code:</b> <code>${request?.referenceNumber ?? 'IH-CONFIRMED'}</code>\n` +
+        `• <b>Focus Area:</b> ${issueText}\n\n` +
+        'Our ministry team has received your request and will communicate with you shortly regarding your session schedule.\n\n' +
+        'Our team is praying with you!',
+        this.botService.getBottomPersistentKeyboard(true),
       );
       return;
     }

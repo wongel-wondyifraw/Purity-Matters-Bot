@@ -229,7 +229,19 @@ export class AdminController {
 
   @Get('inner-healing')
   async getInnerHealing() {
-    return this.innerHealingService.findAll();
+    const [requests, clients] = await Promise.all([
+      this.innerHealingService.findAll(),
+      this.clientsService.findAll(),
+    ]);
+    const clientMap = new Map(clients.map((c) => [String(c.telegramId), c]));
+    return requests.map((item) => {
+      const client = clientMap.get(String(item.telegramId));
+      return {
+        ...item,
+        clientName: item.clientName || client?.fullName || client?.firstName || `User #${item.telegramId}`,
+        phone: item.phone || client?.phone || 'N/A',
+      };
+    });
   }
 
   @Patch('inner-healing/:id')
