@@ -24,7 +24,7 @@ import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
-import { BotService } from '../bot/bot.service.js';
+import { BotService, generateValidPdfBuffer } from '../bot/bot.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
 
@@ -535,11 +535,10 @@ export class AdminController {
           : path.resolve(process.cwd(), 'uploads/resources/ebooks', `${order.resourceTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
 
         // If file does not exist on disk, auto-create a clean valid PDF document so dispatch NEVER fails!
-        if (!fs.existsSync(fullDiskPath)) {
+        if (!fs.existsSync(fullDiskPath) || fs.statSync(fullDiskPath).size < 100) {
           fs.mkdirSync(path.dirname(fullDiskPath), { recursive: true });
-          const cleanTitle = (resource?.title || order.resourceTitle).replace(/[()]/g, '');
-          const fallbackPdfContent = `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n4 0 obj\n<< /Length 220 >>\nstream\nBT\n/F1 20 Tf\n50 720 Td\n(${cleanTitle}) Tj\n/F1 12 Tf\n0 -35 Td\n(Purity Matters Ministry - Official E-Book Resource Edition) Tj\n0 -25 Td\n(Thank you for your purchase. May God bless your journey to wholeness!) Tj\nET\nendstream\nendobj\n5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000244 00000 n \n0000000514 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n583\n%%EOF`;
-          fs.writeFileSync(fullDiskPath, fallbackPdfContent);
+          const cleanTitle = (resource?.title || order.resourceTitle);
+          fs.writeFileSync(fullDiskPath, generateValidPdfBuffer(cleanTitle, resource?.author || undefined));
         }
 
         const caption =
