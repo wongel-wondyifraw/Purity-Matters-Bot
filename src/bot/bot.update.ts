@@ -586,46 +586,7 @@ export class BotUpdate {
     const isFree = !isPaid;
     const catType = item.type === 'physical_book' ? 'physical' : 'ebook';
 
-    // 1. Check if user already has verified access / completed purchase
-    const hasAccess = await this.resourcesService.hasAccess(ctx.from.id, String(item.id));
-
-    if (isFree || hasAccess) {
-      if (item.type === 'physical_book') {
-        const message =
-          `📦 <b>${item.title}</b>\n\n` +
-          `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-          `• <b>Status:</b> ${isFree ? '✅ Free Print Copy Claimed' : '✅ Payment Verified & Order Confirmed'}\n\n` +
-          `📝 <b>Overview:</b>\n${item.description || 'Ministry physical publication.'}\n\n` +
-          `📦 <i>Our fulfillment team will contact you for courier delivery dispatch.</i>`;
-
-        await ctx.replyWithHTML(
-          message,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Back to Physical Books', 'res_cat_physical')],
-            [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
-          ]),
-        );
-        return;
-      }
-
-      // Digital E-Book
-      const accessLabel = isFree ? '✅ Available for Immediate Download (FREE)' : '✅ Purchased & Verified';
-      const buttonLabel = isFree ? '📥 Download Free E-Book' : '📥 Download Official E-Book';
-      const message =
-        `📖 <b>${item.title}</b>\n\n` +
-        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
-        `• <b>Access:</b> ${accessLabel}\n\n` +
-        `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}`;
-
-      await ctx.replyWithHTML(
-        message,
-        this.botService.getResourceFreeKeyboard(item.id, catType, buttonLabel),
-      );
-      return;
-    }
-
-    // 2. Resource is PAID and client has NOT yet been verified.
-    // Check if user already submitted payment and is waiting for admin verification!
+    // 1. Check if user already has an active order (pending or payment_submitted) for this resource
     const activeOrder = await this.resourcesService.findActiveOrderByUserAndResource(
       ctx.from.id,
       item.id,
@@ -661,19 +622,105 @@ export class BotUpdate {
       return;
     }
 
-    // 3. Resource is PAID and user needs to pay:
-    // Create/reuse pending order and display Telebirr and CBE accounts
-    let order = activeOrder && activeOrder.paymentStatus === 'pending' ? activeOrder : null;
-    if (!order) {
-      const client = await this.clientsService.findByTelegramId(ctx.from.id);
-      order = await this.resourcesService.createResourceOrder({
-        resourceId: item.id,
-        telegramId: ctx.from.id,
-        clientName: client?.fullName || ctx.from.first_name || 'Client',
-        username: ctx.from.username,
-        phone: client?.phone || undefined,
-      });
+    if (activeOrder && activeOrder.paymentStatus === 'pending') {
+      const accounts = await this.paymentSettingsService.getFormattedAccounts();
+      const paymentMsg = this.botService.getPaymentInstructionsMessage(
+        item.title,
+        activeOrder.amount || item.price,
+        activeOrder.currency || item.currency || 'ETB',
+        activeOrder.orderNumber,
+        accounts,
+        item.description,
+        item.author,
+      );
+
+      await ctx.replyWithHTML(
+        paymentMsg,
+        this.botService.getPaidResourceActionKeyboard(activeOrder.id, catType),
+      );
+      return;
     }
+
+    // 2. Resource is FREE
+    if (isFree) {
+      if (item.type === 'physical_book') {
+        const message =
+          `📦 <b>${item.title}</b>\n\n` +
+          `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+          `• <b>Status:</b> ✅ Free Print Ministry Resource\n\n` +
+          `📝 <b>Overview:</b>\n${item.description || 'Ministry physical publication.'}\n\n` +
+          `📦 <i>Our fulfillment team manages courier delivery dispatch for this publication.</i>`;
+
+        await ctx.replyWithHTML(
+          message,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back to Physical Books', 'res_cat_physical')],
+            [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+          ]),
+        );
+        return;
+      }
+
+      // Digital E-Book (Free)
+      const message =
+        `📖 <b>${item.title}</b>\n\n` +
+        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+        `• <b>Access:</b> ✅ Available for Immediate Download (FREE)\n\n` +
+        `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}`;
+
+      await ctx.replyWithHTML(
+        message,
+        this.botService.getResourceFreeKeyboard(item.id, catType, '📥 Download Free E-Book'),
+      );
+      return;
+    }
+
+    // 3. Resource is PAID: check if user already purchased and verified in the past
+    const hasAccess = await this.resourcesService.hasAccess(ctx.from.id, String(item.id));
+
+    if (hasAccess) {
+      if (item.type === 'physical_book') {
+        const message =
+          `📦 <b>${item.title}</b>\n\n` +
+          `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+          `• <b>Price:</b> <b>${item.price} ${item.currency || 'ETB'}</b>\n` +
+          `• <b>Status:</b> ✅ <b>Previous Order Verified</b>\n\n` +
+          `📝 <b>Overview:</b>\n${item.description || 'Ministry physical publication.'}\n\n` +
+          `📦 <i>Our fulfillment team manages courier delivery for your previous verified order. Would you like to order another print copy?</i>`;
+
+        await ctx.replyWithHTML(
+          message,
+          this.botService.getResourcePurchasedKeyboard(item, catType),
+        );
+        return;
+      }
+
+      // Digital E-Book (Previously Purchased)
+      const message =
+        `📖 <b>${item.title}</b>\n\n` +
+        `• <b>Author:</b> ${item.author || 'Purity Matters Ministry'}\n` +
+        `• <b>Price:</b> <b>${item.price} ${item.currency || 'ETB'}</b>\n` +
+        `• <b>Access:</b> ✅ <b>Purchased & Verified</b>\n\n` +
+        `📝 <b>Overview:</b>\n${item.description || 'Spiritual purity resource.'}\n\n` +
+        `✨ <i>You already own this publication! You can download it directly below anytime, or purchase another separate copy/gift for someone else.</i>`;
+
+      await ctx.replyWithHTML(
+        message,
+        this.botService.getResourcePurchasedKeyboard(item, catType),
+      );
+      return;
+    }
+
+    // 4. Resource is PAID and client is purchasing for the first time:
+    // Create new pending order and display payment accounts
+    const client = await this.clientsService.findByTelegramId(ctx.from.id);
+    const order = await this.resourcesService.createResourceOrder({
+      resourceId: item.id,
+      telegramId: ctx.from.id,
+      clientName: client?.fullName || ctx.from.first_name || 'Client',
+      username: ctx.from.username,
+      phone: client?.phone || undefined,
+    });
 
     const accounts = await this.paymentSettingsService.getFormattedAccounts();
 
@@ -750,10 +797,86 @@ export class BotUpdate {
     }
   }
 
+  @Action(/^res_reorder_(.+)$/)
+  async onResReorder(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const rawId = (ctx as any).match[1];
+    let item: any = null;
+
+    if (!isNaN(Number(rawId))) {
+      item = await this.resourcesService.findResourceById(Number(rawId));
+    }
+    if (!item) {
+      item = this.resourcesService.getResource(rawId);
+    }
+    if (!item) {
+      await ctx.replyWithHTML('⚠️ Resource not found or no longer active.');
+      return;
+    }
+
+    const catType = item.type === 'physical_book' ? 'physical' : 'ebook';
+
+    // Check if user already has an active order waiting for verification
+    const activeOrder = await this.resourcesService.findActiveOrderByUserAndResource(
+      ctx.from.id,
+      item.id,
+    );
+
+    if (activeOrder && activeOrder.paymentStatus === 'payment_submitted') {
+      await ctx.replyWithHTML(
+        `⏳ <b>Order Already Pending Verification</b>\n\n` +
+          `You already have an order (<code>${activeOrder.orderNumber}</code>) for <b>${item.title}</b> currently awaiting verification by our administration team.\n\n` +
+          `As soon as our team confirms it, you will receive your resource and can place further orders if desired.`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Refresh Status', `res_view_${item.id}`)],
+          [Markup.button.callback('🔙 Back to List', `res_cat_${catType}`)],
+          [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+        ]),
+      );
+      return;
+    }
+
+    // Always create a brand-new separate order when reordering another copy!
+    const client = await this.clientsService.findByTelegramId(ctx.from.id);
+    const order = await this.resourcesService.createResourceOrder({
+      resourceId: item.id,
+      telegramId: ctx.from.id,
+      clientName: client?.fullName || ctx.from.first_name || 'Client',
+      username: ctx.from.username,
+      phone: client?.phone || undefined,
+    });
+
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    const headerNotice =
+      item.type === 'physical_book'
+        ? `📦 <b>Ordering Another Physical Copy</b>\n\n`
+        : `🛍️ <b>Ordering Another Copy / Gift</b>\n\n`;
+
+    const paymentMsg =
+      headerNotice +
+      `A new separate order has been generated for you (Order: <code>${order.orderNumber}</code>).\n\n` +
+      this.botService.getPaymentInstructionsMessage(
+        item.title,
+        order.amount || item.price,
+        order.currency || item.currency || 'ETB',
+        order.orderNumber,
+        accounts,
+        item.description,
+        item.author,
+      );
+
+    await ctx.replyWithHTML(
+      paymentMsg,
+      this.botService.getPaidResourceActionKeyboard(order.id, catType),
+    );
+  }
+
   @Action(/^res_buy_(.+)$/)
   async onResBuy(@Ctx() ctx: BotContext) {
-    // Forward directly to onResView which handles order creation and payment accounts display
-    return this.onResView(ctx);
+    return this.onResReorder(ctx);
   }
 
   @Action(/^pay_confirm_(\d+)_(telebirr|cbe)$/)
@@ -781,8 +904,9 @@ export class BotUpdate {
         `📥 <b>As soon as confirmed on our admin console, your resource will be automatically delivered directly to you right here in this chat!</b>\n\n` +
         `<i>Tip: You may reply to this chat with your transaction reference number or bank SMS to help our team verify even faster.</i>`,
       Markup.inlineKeyboard([
-        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+        [Markup.button.callback('🔄 Refresh Status', `res_view_${order.resourceId}`)],
         [Markup.button.callback('📖 Browse Other Resources', 'srv_resources')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
       ]),
     );
   }

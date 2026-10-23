@@ -623,7 +623,7 @@ export class ResourcesService implements OnModuleInit {
       where: {
         telegramId: String(telegramId),
         resourceId,
-        paymentStatus: In(['pending', 'payment_submitted', 'verified']),
+        paymentStatus: In(['pending', 'payment_submitted']),
       },
       order: { createdAt: 'DESC' },
     });

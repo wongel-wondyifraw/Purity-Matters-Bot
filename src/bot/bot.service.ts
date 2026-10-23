@@ -374,6 +374,40 @@ export class BotService {
     ]);
   }
 
+  getResourcePurchasedKeyboard(
+    resource: any,
+    categoryType: string = 'ebook',
+  ) {
+    const isPhysical = categoryType === 'physical_book' || resource.type === 'physical_book';
+    const buttons: any[] = [];
+
+    if (!isPhysical) {
+      buttons.push([Markup.button.callback('📥 Download Official E-Book', `res_dl_${resource.id}`)]);
+      buttons.push([
+        Markup.button.callback(
+          `💳 Buy Another Copy / Gift (${resource.price || 250} ${resource.currency || 'ETB'})`,
+          `res_reorder_${resource.id}`,
+        ),
+      ]);
+    } else {
+      buttons.push([
+        Markup.button.callback(
+          `📦 Order Another Copy (${resource.price || 250} ${resource.currency || 'ETB'})`,
+          `res_reorder_${resource.id}`,
+        ),
+      ]);
+    }
+
+    buttons.push([
+      Markup.button.callback(
+        `🔙 Back to ${isPhysical ? 'Physical Books' : 'E-Books'}`,
+        `res_cat_${isPhysical ? 'physical' : 'ebook'}`,
+      ),
+    ]);
+    buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')]);
+    return Markup.inlineKeyboard(buttons);
+  }
+
   getPaidResourceActionKeyboard(orderId: number, categoryType: string = 'ebook') {
     return Markup.inlineKeyboard([
       [
@@ -390,8 +424,11 @@ export class BotService {
     const isFree = !isPaid;
     const cat = resource.type === 'physical_book' ? 'physical' : 'ebook';
 
-    if (isFree || hasPurchased) {
-      return this.getResourceFreeKeyboard(resource.id, cat, isFree ? '📥 Download Free E-Book' : '📥 Download Official E-Book');
+    if (isFree) {
+      return this.getResourceFreeKeyboard(resource.id, cat, '📥 Download Free E-Book');
+    }
+    if (hasPurchased) {
+      return this.getResourcePurchasedKeyboard(resource, cat);
     }
     return Markup.inlineKeyboard([
       [Markup.button.callback(`💳 Pay & Order (${resource.price || 250} ${resource.currency || 'ETB'})`, `res_view_${resource.id}`)],
