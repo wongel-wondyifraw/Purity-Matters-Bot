@@ -23,7 +23,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
           'purity-matters-console-jwt-secret-key-2026',
         ),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn', '7d') as any,
+          expiresIn: configService.get<string>('jwt.expiresIn', '30d') as any,
         },
       }),
     }),

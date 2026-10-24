@@ -22,7 +22,7 @@ export default () => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? 'purity-matters-console-jwt-secret-key-2026',
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN ?? '30d',
   },
   defaultAdmin: {
     email: process.env.DEFAULT_ADMIN_EMAIL ?? 'admin@puritymatters.org',
