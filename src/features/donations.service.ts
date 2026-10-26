@@ -30,18 +30,17 @@ export class DonationsService {
   }
 
   async create(data: CreateDonationDto): Promise<Donation> {
-    const donation = this.donationRepo.create({
-      referenceNumber: this.generateReference(),
-      telegramId: String(data.telegramId),
-      clientName: data.clientName || 'Anonymous Partner',
-      clientUsername: data.clientUsername || null,
-      clientPhone: data.clientPhone || null,
-      amount: Number(data.amount) || 0,
-      currency: data.currency || 'ETB',
-      paymentMethod: data.paymentMethod || 'telebirr',
-      status: 'pending',
-      notes: data.notes || null,
-    });
+    const donation = new Donation();
+    donation.referenceNumber = this.generateReference();
+    donation.telegramId = String(data.telegramId);
+    donation.clientName = data.clientName || 'Anonymous Partner';
+    donation.clientUsername = data.clientUsername || null;
+    donation.clientPhone = data.clientPhone || null;
+    donation.amount = Number(data.amount) || 0;
+    donation.currency = data.currency || 'ETB';
+    donation.paymentMethod = data.paymentMethod || 'telebirr';
+    donation.status = 'pending';
+    donation.notes = data.notes || null;
     return this.donationRepo.save(donation);
   }
 

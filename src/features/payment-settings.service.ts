@@ -99,6 +99,10 @@ export class PaymentSettingsService implements OnModuleInit {
     };
   }
 
+  async getPaymentAccounts(): Promise<PaymentAccountsResponse> {
+    return this.getFormattedAccounts();
+  }
+
   async getActiveAccounts(): Promise<PaymentSetting[]> {
     return this.paymentSettingRepo.find({ where: { isActive: true } });
   }

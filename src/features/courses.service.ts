@@ -159,7 +159,13 @@ export class CoursesService {
   async findCourseBySlug(slug: string): Promise<Course | null> {
     return this.courseRepo.findOne({
       where: { slug },
-      relations: ['modules', 'modules.sections', 'modules.sections.materials'],
+      relations: {
+        modules: {
+          sections: {
+            materials: true,
+          },
+        },
+      },
     });
   }
 
@@ -341,7 +347,7 @@ export class CoursesService {
   ): Promise<CourseModule> {
     const module = await this.moduleRepo.findOne({
       where: { id: moduleId, courseId },
-      relations: ['course'],
+      relations: { course: true },
     });
 
     if (!module) {
@@ -377,7 +383,7 @@ export class CoursesService {
   async deleteModule(courseId: number, moduleId: number): Promise<boolean> {
     const module = await this.moduleRepo.findOne({
       where: { id: moduleId, courseId },
-      relations: ['course'],
+      relations: { course: true },
     });
     if (!module) return false;
 
@@ -398,7 +404,12 @@ export class CoursesService {
   async findModuleWithSections(moduleId: number): Promise<CourseModule | null> {
     return this.moduleRepo.findOne({
       where: { id: moduleId },
-      relations: ['sections', 'sections.materials', 'course'],
+      relations: {
+        sections: {
+          materials: true,
+        },
+        course: true,
+      },
       order: {
         sections: { orderIndex: 'ASC' },
       },
@@ -419,7 +430,7 @@ export class CoursesService {
   ): Promise<CourseSection> {
     const module = await this.moduleRepo.findOne({
       where: { id: moduleId },
-      relations: ['sections'],
+      relations: { sections: true },
     });
 
     if (!module) {
@@ -465,7 +476,7 @@ export class CoursesService {
   async deleteSection(sectionId: number): Promise<boolean> {
     const section = await this.sectionRepo.findOne({
       where: { id: sectionId },
-      relations: ['materials'],
+      relations: { materials: true },
     });
     if (!section) return false;
 
@@ -500,7 +511,7 @@ export class CoursesService {
   ): Promise<CourseMaterial> {
     const section = await this.sectionRepo.findOne({
       where: { id: sectionId, moduleId },
-      relations: ['module', 'module.course'],
+      relations: { module: { course: true } },
     });
 
     if (!section) {

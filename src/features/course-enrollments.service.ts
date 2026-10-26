@@ -21,14 +21,14 @@ export class CourseEnrollmentsService {
   async getEnrollment(telegramId: string | number, courseId: number): Promise<CourseEnrollment | null> {
     return this.enrollmentRepo.findOne({
       where: { telegramId: String(telegramId), courseId },
-      relations: ['course', 'course.modules'],
+      relations: { course: { modules: true } },
     });
   }
 
   async getUserEnrollments(telegramId: string | number): Promise<CourseEnrollment[]> {
     return this.enrollmentRepo.find({
       where: { telegramId: String(telegramId) },
-      relations: ['course'],
+      relations: { course: true },
       order: { updatedAt: 'DESC' },
     });
   }
@@ -44,7 +44,7 @@ export class CourseEnrollmentsService {
     const tid = String(data.telegramId);
     let enrollment = await this.enrollmentRepo.findOne({
       where: { telegramId: tid, courseId: data.courseId },
-      relations: ['course', 'course.modules'],
+      relations: { course: { modules: true } },
     });
 
     if (enrollment) {
@@ -54,7 +54,7 @@ export class CourseEnrollmentsService {
 
     const course = await this.courseRepo.findOne({
       where: { id: data.courseId },
-      relations: ['modules'],
+      relations: { modules: true },
       order: { modules: { orderIndex: 'ASC' } },
     });
 
@@ -95,7 +95,7 @@ export class CourseEnrollmentsService {
     const tid = String(data.telegramId);
     let enrollment = await this.enrollmentRepo.findOne({
       where: { telegramId: tid, courseId: data.courseId },
-      relations: ['course', 'course.modules'],
+      relations: { course: { modules: true } },
     });
 
     if (enrollment) {
@@ -114,7 +114,7 @@ export class CourseEnrollmentsService {
 
     const course = await this.courseRepo.findOne({
       where: { id: data.courseId },
-      relations: ['modules'],
+      relations: { modules: true },
       order: { modules: { orderIndex: 'ASC' } },
     });
 
@@ -145,7 +145,7 @@ export class CourseEnrollmentsService {
   async verifyPayment(id: number, adminNotes?: string): Promise<CourseEnrollment> {
     const enrollment = await this.enrollmentRepo.findOne({
       where: { id },
-      relations: ['course', 'course.modules'],
+      relations: { course: { modules: true } },
     });
 
     if (!enrollment) {
@@ -194,7 +194,7 @@ export class CourseEnrollmentsService {
     const tid = String(telegramId);
     const enrollment = await this.enrollmentRepo.findOne({
       where: { telegramId: tid, courseId },
-      relations: ['course'],
+      relations: { course: true },
     });
 
     if (!enrollment) {
@@ -203,7 +203,7 @@ export class CourseEnrollmentsService {
 
     const course = await this.courseRepo.findOne({
       where: { id: courseId },
-      relations: ['modules'],
+      relations: { modules: true },
       order: { modules: { orderIndex: 'ASC' } },
     });
 
@@ -297,7 +297,15 @@ export class CourseEnrollmentsService {
   async findById(id: number): Promise<any> {
     const enrollment = await this.enrollmentRepo.findOne({
       where: { id },
-      relations: ['course', 'course.modules', 'course.modules.sections', 'course.modules.sections.materials'],
+      relations: {
+        course: {
+          modules: {
+            sections: {
+              materials: true,
+            },
+          },
+        },
+      },
     });
 
     if (!enrollment) {

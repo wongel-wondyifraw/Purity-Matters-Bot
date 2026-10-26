@@ -1067,6 +1067,35 @@ export class AdminController {
     }
     return { success: true, message: `Donation #${id} deleted successfully.` };
   }
+
+  // ==========================================
+  // BOT UPDATE BROADCAST
+  // ==========================================
+
+  @Post('bot/broadcast-update')
+  async broadcastBotUpdate(
+    @Body() body: { version: string; releaseNotes?: string },
+  ) {
+    if (!body?.version?.trim()) {
+      throw new BadRequestException('Version number is required.');
+    }
+
+    const clients = await this.clientsService.findAll();
+    const telegramIds = Array.from(new Set(clients.map((c) => c.telegramId).filter(Boolean)));
+
+    const result = await this.botService.broadcastBotUpdate(
+      telegramIds,
+      body.version.trim(),
+      body.releaseNotes?.trim(),
+    );
+
+    return {
+      success: true,
+      sent: result.sent,
+      failed: result.failed,
+      message: `Bot update announcement sent to ${result.sent} user(s).`,
+    };
+  }
 }
 
 

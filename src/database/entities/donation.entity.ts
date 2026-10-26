@@ -22,11 +22,11 @@ export class Donation {
   @Column()
   clientName: string;
 
-  @Column({ nullable: true })
-  clientUsername?: string;
+  @Column({ type: 'varchar', nullable: true })
+  clientUsername?: string | null;
 
-  @Column({ nullable: true })
-  clientPhone?: string;
+  @Column({ type: 'varchar', nullable: true })
+  clientPhone?: string | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
@@ -41,16 +41,16 @@ export class Donation {
   status: DonationStatus;
 
   @Column({ nullable: true })
-  transactionReference?: string;
+  transactionReference?: string | null;
 
   @Column({ type: 'text', nullable: true })
-  notes?: string;
+  notes?: string | null;
 
   @Column({ type: 'text', nullable: true })
-  adminNotes?: string;
+  adminNotes?: string | null;
 
   @Column({ type: 'timestamp', nullable: true })
-  verifiedAt?: Date;
+  verifiedAt?: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

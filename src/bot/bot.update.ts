@@ -41,6 +41,23 @@ export class BotUpdate {
     await ctx.replyWithHTML(message, stickyKeyboard);
   }
 
+  @Action('cmd_start_refresh')
+  async onStartRefresh(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery('Bot menu refreshed!', { show_alert: false });
+    }
+
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+    const welcome =
+      `✅ <b>Bot Successfully Refreshed & Updated!</b>\n\n` +
+      `Your persistent menu below is now fully synchronized with our latest services, dynamic courses, and features.\n\n` +
+      `Please select a service using the menu buttons below to continue:`;
+    const stickyKeyboard = this.botService.getBottomPersistentKeyboard(client.isRegistered);
+
+    await ctx.replyWithHTML(welcome, stickyKeyboard);
+  }
+
   @Help()
   @Hears('❓ Help')
   async onHelp(@Ctx() ctx: BotContext) {

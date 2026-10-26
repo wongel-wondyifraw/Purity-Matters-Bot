@@ -254,6 +254,41 @@ export class BotService {
     }
   }
 
+  async broadcastBotUpdate(
+    telegramIds: string[],
+    version: string,
+    releaseNotes?: string,
+  ): Promise<{ sent: number; failed: number }> {
+    let sent = 0;
+    let failed = 0;
+
+    const formattedNotes = releaseNotes?.trim()
+      ? `\n<b>What's New:</b>\n${releaseNotes.trim()}\n`
+      : '';
+
+    const message =
+      `🚀 <b>Purity Matters Bot Updated to ${version}!</b>\n` +
+      `${formattedNotes}\n` +
+      `We have introduced brand new features, dynamic training courses, and enhanced learning tools.\n\n` +
+      `Tap the button below to refresh your bot menu and get the latest experience!`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('🔄 Refresh & Update Bot Menu', 'cmd_start_refresh')],
+    ]);
+
+    for (const tid of telegramIds) {
+      if (!tid) continue;
+      try {
+        await this.sendMessageToUser(tid, message, keyboard);
+        sent++;
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    return { sent, failed };
+  }
+
   getWelcomeMessage(client: Client): string {
     const name = client.fullName ?? client.firstName ?? client.username ?? 'Friend';
     return (
