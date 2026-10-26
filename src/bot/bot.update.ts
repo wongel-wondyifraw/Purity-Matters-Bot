@@ -10,6 +10,7 @@ import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
+import { DonationsService } from '../features/donations.service.js';
 
 @Update()
 export class BotUpdate {
@@ -23,6 +24,7 @@ export class BotUpdate {
     private readonly coursesService: CoursesService,
     private readonly resourcesService: ResourcesService,
     private readonly paymentSettingsService: PaymentSettingsService,
+    private readonly donationsService: DonationsService,
   ) {}
 
   @Start()
@@ -51,9 +53,10 @@ export class BotUpdate {
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
     }
+    const client = ctx.from ? await this.clientsService.findByTelegramId(ctx.from.id) : null;
     await ctx.replyWithHTML(
       this.botService.getServicesMenuMessage(),
-      this.botService.getServicesMenuKeyboard(),
+      this.botService.getBottomPersistentKeyboard(client?.isRegistered ?? false),
     );
   }
 
@@ -63,14 +66,14 @@ export class BotUpdate {
     await ctx.answerCbQuery();
     const client = await this.clientsService.findByTelegramId(ctx.from.id);
     await ctx.replyWithHTML(
-      '🏠 <b>Main Menu:</b>\n\nChoose an option from the bottom persistent keyboard or below:',
+      '🏠 <b>Main Menu:</b>\n\nChoose an option from the persistent keyboard below:',
       this.botService.getBottomPersistentKeyboard(client?.isRegistered ?? false),
     );
   }
 
   @Command('status')
   @Action('cmd_status')
-  @Hears(['👤 My Profile', '📋 My Status'])
+  @Hears(['👤 My Requests & Profile', '👤 My Profile', '📋 My Status'])
   async onStatus(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
@@ -460,7 +463,7 @@ export class BotUpdate {
   // C. TRAINING & COURSES FLOW
   // ==========================================
   @Action('srv_courses')
-  @Hears(['📚 C. Training & Courses', '📚 Courses'])
+  @Hears(['📚 Training & Courses', '📚 C. Training & Courses', '📚 Courses'])
   async onSrvCourses(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     if (ctx.callbackQuery) {
@@ -949,6 +952,7 @@ export class BotUpdate {
           [Markup.button.callback('📱 Browse Digital E-Books', 'res_cat_ebook')],
           [Markup.button.callback('📦 Browse Physical Books', 'res_cat_physical')],
           [Markup.button.callback('🔙 Back to Catalog', 'srv_resources')],
+          [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
         ]),
       );
       return;
@@ -992,7 +996,7 @@ export class BotUpdate {
     }
 
     buttons.push([Markup.button.callback('🔙 Back to Catalog', 'srv_resources')]);
-    buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')]);
+    buttons.push([Markup.button.callback('🔙 Return to Services', 'cmd_services')]);
 
     await ctx.replyWithHTML(msg, Markup.inlineKeyboard(buttons));
   }
@@ -1110,6 +1114,42 @@ export class BotUpdate {
       return;
     }
 
+    // Donation custom amount input step
+    if (client.registrationStep === 'don_awaiting_amount') {
+      const cleanNum = text.replace(/[^0-9.]/g, '');
+      const parsedAmount = parseFloat(cleanNum);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        await ctx.replyWithHTML(
+          '⚠️ <b>Invalid Amount:</b> Please enter a valid donation amount in ETB (e.g. <code>250</code> or <code>1000</code>):',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back to Donations', 'cmd_donate')],
+            [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+          ]),
+        );
+        return;
+      }
+
+      await this.clientsService.setRegistrationStep(client.telegramId, null);
+      const accounts = await this.paymentSettingsService.getFormattedAccounts();
+      const donation = await this.donationsService.create({
+        telegramId: ctx.from.id,
+        clientName: client.fullName || client.firstName || 'Friend',
+        clientUsername: ctx.from.username,
+        clientPhone: client.phone,
+        amount: parsedAmount,
+      });
+
+      await ctx.replyWithHTML(
+        this.botService.getDonationAccountInstructionsMessage(
+          parsedAmount,
+          donation.referenceNumber,
+          accounts,
+        ),
+        this.botService.getDonationActionKeyboard(donation.id),
+      );
+      return;
+    }
+
     // Check if user has an order awaiting payment reference and sent reference code/SMS
     const pendingOrders = await this.resourcesService.findAllResourceOrders({
       paymentStatus: 'payment_submitted',
@@ -1134,5 +1174,111 @@ export class BotUpdate {
     }
 
     this.logger.debug(`Received message from ${ctx.from.id}: ${text}`);
+  }
+
+  // ==========================================
+  // DONATIONS FLOW (Telebirr & CBE)
+  // ==========================================
+  @Command('donate')
+  @Action('cmd_donate')
+  @Hears(['💝 Donate', '🎁 Donate', 'Donate', '/donate'])
+  async onDonate(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    await ctx.replyWithHTML(
+      this.botService.getDonationAccountInstructionsMessage(null, null, accounts),
+      this.botService.getDonationAmountsKeyboard(),
+    );
+  }
+
+  @Action(/^don_amt_(\d+)$/)
+  async onDonationPresetAmount(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const amount = parseInt((ctx as any).match[1], 10);
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    const donation = await this.donationsService.create({
+      telegramId: ctx.from.id,
+      clientName: client.fullName || client.firstName || 'Friend',
+      clientUsername: ctx.from.username,
+      clientPhone: client.phone,
+      amount,
+    });
+
+    await ctx.replyWithHTML(
+      this.botService.getDonationAccountInstructionsMessage(
+        amount,
+        donation.referenceNumber,
+        accounts,
+      ),
+      this.botService.getDonationActionKeyboard(donation.id),
+    );
+  }
+
+  @Action('don_amt_custom')
+  async onDonationCustomAmount(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+    await this.clientsService.setRegistrationStep(client.telegramId, 'don_awaiting_amount');
+
+    await ctx.replyWithHTML(
+      '✏️ <b>Enter Donation Amount</b>\n\n' +
+        'Please type the amount in ETB you wish to donate (e.g. <code>300</code> or <code>1500</code>):',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 Back to Donations', 'cmd_donate')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+      ]),
+    );
+  }
+
+  @Action(/^don_paid_(\d+)(?:_(telebirr|cbe|other))?$/)
+  async onDonationPaid(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const match = (ctx as any).match;
+    const donationId = parseInt(match[1], 10);
+    const method = match[2] || 'telebirr';
+
+    const donation = await this.donationsService.markAsDonated(donationId, method);
+
+    await ctx.replyWithHTML(
+      '🙏 <b>Thank You for Your Generous Heart!</b>\n\n' +
+        `Your gift of <b>${donation.amount} ${donation.currency}</b> has been received and submitted for verification.\n\n` +
+        `• <b>Donation Reference:</b> <code>${donation.referenceNumber}</code>\n` +
+        `• <b>Payment Method:</b> <b>${donation.paymentMethod.toUpperCase()}</b>\n` +
+        `• <b>Status:</b> ⏳ <b>Pending Verification</b>\n\n` +
+        `Our administration team will verify your transfer on our console shortly.\n\n` +
+        `<i>"Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver." — 2 Cor 9:7</i>`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+      ]),
+    );
+  }
+
+  @Action(/^don_cancel_(\d+)$/)
+  async onDonationCancel(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const match = (ctx as any).match;
+    const donationId = parseInt(match[1], 10);
+    await this.donationsService.delete(donationId);
+
+    await ctx.replyWithHTML(
+      '❌ <b>Donation Cancelled</b>\n\nYou can donate anytime using the 💝 Donate button below.',
+      this.botService.getBottomPersistentKeyboard(),
+    );
   }
 }

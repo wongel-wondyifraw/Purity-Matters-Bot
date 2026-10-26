@@ -264,7 +264,9 @@ export class BotService {
   getBottomPersistentKeyboard(isRegistered = false) {
     return Markup.keyboard([
       ['🛋️ Counselling Request', '🕊️ Inner Healing'],
-      ['📖 Resource Request', 'ℹ️ About Us'],
+      ['📚 Training & Courses', '📖 Resource Request'],
+      ['👤 My Requests & Profile', '💝 Donate'],
+      ['ℹ️ About Us'],
     ])
       .resize()
       .persistent();
@@ -299,24 +301,18 @@ export class BotService {
   getServicesMenuMessage(): string {
     return (
       `🌟 <b>Purity Matters Services Menu</b>\n\n` +
-      `Please select a service using the buttons below:\n\n` +
-      `🛋️ <b>A. Counselling</b> — Confidential 1-on-1 support for personal, family, relationship, or purity concerns.\n\n` +
-      `🕊️ <b>B. Inner Healing</b> — Healing prayer and restoration for rejection, abandonment, and emotional wounds.\n\n` +
-      `📚 <b>C. Training & Courses</b> — 7-day and 21-day structured transformation journeys.\n\n` +
-      `📖 <b>D. Resources & E-Books</b> — Essential guides, workbooks, and paid e-books for your walk.`
+      `Please select a service using the persistent menu buttons below:\n\n` +
+      `🛋️ <b>Counselling Request</b> — Confidential 1-on-1 support for personal, family, relationship, or purity concerns.\n\n` +
+      `🕊️ <b>Inner Healing</b> — Healing prayer and restoration for rejection, abandonment, and emotional wounds.\n\n` +
+      `📚 <b>Training & Courses</b> — 7-day and 21-day structured transformation journeys.\n\n` +
+      `📖 <b>Resource Request</b> — Essential guides, workbooks, and paid e-books for your walk.\n\n` +
+      `👤 <b>My Requests & Profile</b> — View your active requests, orders, and profile status.`
     );
   }
 
   getServicesMenuKeyboard() {
     return Markup.inlineKeyboard([
-      [Markup.button.callback('🛋️ A. Counselling', 'srv_counselling')],
-      [Markup.button.callback('🕊️ B. Inner Healing', 'srv_inner_healing')],
-      [Markup.button.callback('📚 C. Training & Courses', 'srv_courses')],
-      [Markup.button.callback('📖 D. Resources & E-Books', 'srv_resources')],
-      [
-        Markup.button.callback('👤 My Requests & Profile', 'cmd_status'),
-        Markup.button.callback('🏠 Home', 'cmd_main_menu'),
-      ],
+      [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
     ]);
   }
 
@@ -491,6 +487,7 @@ export class BotService {
         `res_cat_${isPhysical ? 'physical' : 'ebook'}`,
       ),
     ]);
+    buttons.push([Markup.button.callback('🔙 Return to Services', 'cmd_services')]);
     buttons.push([Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')]);
     return Markup.inlineKeyboard(buttons);
   }
@@ -600,5 +597,76 @@ export class BotService {
       `Through confidential counselling, inner healing ministries, structured journeys, and biblical resources, ` +
       `we walk alongside you on the journey to total wholeness.`
     );
+  }
+
+  // --- E. Donations ---
+  getDonationAccountInstructionsMessage(
+    amount: number | null,
+    referenceNumber: string | null,
+    accounts: PaymentAccountsResponse,
+  ): string {
+    let msg = `💝 <b>Support & Partner with Purity Matters</b>\n\n`;
+    msg += `Your generous donation supports individuals receiving counselling, inner healing, and transformation journeys to walk in divine wholeness and purity.\n\n`;
+
+    if (amount) {
+      msg += `💰 <b>Donation Amount:</b> <b>${amount} ETB</b>\n`;
+    }
+    if (referenceNumber) {
+      msg += `🔖 <b>Donation Reference:</b> <code>${referenceNumber}</code> <i>(tap to copy)</i>\n`;
+    }
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `💳 <b>PAYMENT ACCOUNTS (Telebirr & CBE)</b>\n\n`;
+
+    if (accounts.telebirr && accounts.telebirr.isActive) {
+      msg += `📱 <b>Telebirr:</b>\n`;
+      msg += `• Phone Number: <code>${accounts.telebirr.accountNumber}</code> <i>(tap to copy)</i>\n`;
+      msg += `• Name: <b>${accounts.telebirr.accountName}</b>\n\n`;
+    }
+
+    if (accounts.cbe && accounts.cbe.isActive) {
+      msg += `🏦 <b>Commercial Bank of Ethiopia (CBE):</b>\n`;
+      msg += `• Account Number: <code>${accounts.cbe.accountNumber}</code> <i>(tap to copy)</i>\n`;
+      msg += `• Name: <b>${accounts.cbe.accountName}</b>\n`;
+      if (accounts.cbe.branchOrShortcode) {
+        msg += `• Branch: ${accounts.cbe.branchOrShortcode}\n`;
+      }
+      msg += `\n`;
+    }
+
+    if (amount) {
+      msg += `👇 <b>After completing transfer, tap "I Have Donated" below:</b>`;
+    } else {
+      msg += `👇 <b>Select or specify a donation amount:</b>`;
+    }
+
+    return msg;
+  }
+
+  getDonationAmountsKeyboard() {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('100 ETB', 'don_amt_100'),
+        Markup.button.callback('250 ETB', 'don_amt_250'),
+        Markup.button.callback('500 ETB', 'don_amt_500'),
+      ],
+      [
+        Markup.button.callback('1,000 ETB', 'don_amt_1000'),
+        Markup.button.callback('2,500 ETB', 'don_amt_2500'),
+        Markup.button.callback('5,000 ETB', 'don_amt_5000'),
+      ],
+      [Markup.button.callback('✏️ Custom Amount', 'don_amt_custom')],
+      [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
+    ]);
+  }
+
+  getDonationActionKeyboard(donationId: number) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ I Have Donated (Telebirr)', `don_paid_${donationId}_telebirr`),
+        Markup.button.callback('✅ I Have Donated (CBE)', `don_paid_${donationId}_cbe`),
+      ],
+      [Markup.button.callback('✅ I Have Donated', `don_paid_${donationId}_other`)],
+      [Markup.button.callback('❌ Cancel Donation', `don_cancel_${donationId}`)],
+    ]);
   }
 }

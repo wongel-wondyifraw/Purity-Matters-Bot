@@ -24,6 +24,7 @@ import { CoursesService } from '../features/courses.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
+import { DonationsService } from '../features/donations.service.js';
 import { BotService, generateValidPdfBuffer, resolveUploadDiskPath } from '../bot/bot.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
@@ -38,6 +39,7 @@ export class AdminController {
     private readonly resourcesService: ResourcesService,
     private readonly questionsService: AnonymousQuestionsService,
     private readonly paymentSettingsService: PaymentSettingsService,
+    private readonly donationsService: DonationsService,
     private readonly botService: BotService,
   ) {}
 
@@ -49,18 +51,23 @@ export class AdminController {
       innerHealingList,
       courseProgressList,
       purchaseList,
+      donationList,
     ] = await Promise.all([
       this.clientsService.count(),
       this.counselingService.findAll(),
       this.innerHealingService.findAll(),
       this.coursesService.getAllProgress(),
       this.resourcesService.getAllPurchases(),
+      this.donationsService.findAll(),
     ]);
 
     const pendingCounseling = counselingList.filter((c) => c.status === 'pending').length;
     const pendingInnerHealing = innerHealingList.filter((i) => i.status === 'pending').length;
     const accountabilityNeeded = courseProgressList.filter((cp) => cp.accountabilityRequested).length;
     const totalSales = purchaseList.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const verifiedDonations = donationList.filter((d) => d.status === 'verified');
+    const totalDonatedAmount = verifiedDonations.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const pendingDonations = donationList.filter((d) => d.status === 'payment_submitted' || d.status === 'pending').length;
 
     return {
       totalClients,
@@ -72,6 +79,9 @@ export class AdminController {
       accountabilityNeeded,
       totalPurchases: purchaseList.length,
       totalSales,
+      totalDonations: donationList.length,
+      totalDonatedAmount,
+      pendingDonations,
     };
   }
 
@@ -665,6 +675,45 @@ export class AdminController {
       throw new NotFoundException(`Resource order #${id} not found.`);
     }
     return { success: true, message: `Resource order #${id} deleted successfully.` };
+  }
+
+  // ==========================================
+  // DONATIONS MANAGEMENT
+  // ==========================================
+
+  @Get('donations')
+  async getDonations(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.donationsService.findAll({ status, search });
+  }
+
+  @Post('donations/:id/verify')
+  async verifyDonation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { adminNotes?: string },
+  ) {
+    const donation = await this.donationsService.updateStatus(id, 'verified', body?.adminNotes);
+    return { success: true, donation, message: 'Donation verified successfully.' };
+  }
+
+  @Post('donations/:id/reject')
+  async rejectDonation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { reason?: string },
+  ) {
+    const donation = await this.donationsService.updateStatus(id, 'rejected', body?.reason);
+    return { success: true, donation, message: 'Donation marked as rejected.' };
+  }
+
+  @Delete('donations/:id')
+  async deleteDonation(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.donationsService.delete(id);
+    if (!success) {
+      throw new NotFoundException(`Donation #${id} not found.`);
+    }
+    return { success: true, message: `Donation #${id} deleted successfully.` };
   }
 }
 
