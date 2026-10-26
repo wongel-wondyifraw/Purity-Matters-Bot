@@ -8,6 +8,7 @@ import { CourseEnrollmentsService } from '../features/course-enrollments.service
 import { ResourcesService } from '../features/resources.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
 import { DonationsService } from '../features/donations.service.js';
+export declare const RESERVED_MENU_BUTTONS: string[];
 export declare class BotUpdate {
     private readonly botService;
     private readonly clientsService;
@@ -26,6 +27,7 @@ export declare class BotUpdate {
     onServices(ctx: BotContext): Promise<void>;
     onMainMenu(ctx: BotContext): Promise<void>;
     onStatus(ctx: BotContext): Promise<void>;
+    onEditName(ctx: BotContext): Promise<void>;
     onPing(ctx: BotContext): Promise<void>;
     onAbout(ctx: BotContext): Promise<void>;
     onRegister(ctx: BotContext): Promise<void>;

@@ -14,6 +14,35 @@ import { ResourcesService } from '../features/resources.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
 import { DonationsService } from '../features/donations.service.js';
 
+export const RESERVED_MENU_BUTTONS = [
+  '🛋️ Counselling Request',
+  '🛋️ A. Counselling',
+  '🛋️ Counselling',
+  '🕊️ Inner Healing',
+  '🕊️ B. Inner Healing',
+  'Inner Healing',
+  '📚 Training & Courses',
+  '📚 C. Training & Courses',
+  '📚 Courses',
+  '📖 Resource Request',
+  '📖 D. Resources & E-Books',
+  '📖 Resources',
+  '👤 My Requests & Profile',
+  '👤 My Profile',
+  '📋 My Status',
+  '💝 Donate',
+  '🎁 Donate',
+  'Donate',
+  'ℹ️ About Us',
+  'About Us',
+  '❓ Help',
+  'Help',
+  '✨ Register as Client',
+  'Register',
+  '❌ Cancel Registration',
+  'Cancel',
+];
+
 @Update()
 export class BotUpdate {
   private readonly logger = new Logger(BotUpdate.name);
@@ -34,6 +63,7 @@ export class BotUpdate {
   async onStart(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
 
+    await this.clientsService.setRegistrationStep(ctx.from.id, null);
     const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
     const message = this.botService.getWelcomeMessage(client);
     const stickyKeyboard = this.botService.getBottomPersistentKeyboard(client.isRegistered);
@@ -128,7 +158,26 @@ export class BotUpdate {
       statusText += `\n`;
     }
 
-    await ctx.replyWithHTML(statusText, this.botService.getBottomPersistentKeyboard(client.isRegistered));
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('✏️ Edit Full Name', 'cmd_edit_name')],
+      [Markup.button.callback('✨ Browse Services', 'cmd_services')],
+    ]);
+
+    await ctx.replyWithHTML(statusText, keyboard);
+  }
+
+  @Action('cmd_edit_name')
+  async onEditName(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    await this.clientsService.setRegistrationStep(ctx.from.id, 'awaiting_name');
+    await ctx.replyWithHTML(
+      '✏️ <b>Update Full Name</b>\n\nPlease enter your real full name (or send /cancel to abort):',
+      this.botService.getRemoveKeyboard(),
+    );
   }
 
   @Command('ping')
@@ -397,28 +446,14 @@ export class BotUpdate {
 
     const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
 
-    // If client is not yet registered, start registration
+    // If client is not yet registered, route to unified registration
     if (!client.isRegistered) {
-      if (!client.fullName || client.fullName.length < 2) {
-        await this.clientsService.setRegistrationStep(ctx.from.id, 'ih_awaiting_name');
-        await ctx.replyWithHTML(
-          '🕊️ <b>Inner Healing Registration</b>\n\n' +
-          'Welcome! To begin, please enter your full name:',
-        );
-        return;
-      }
-
-      if (!client.phone) {
-        await this.clientsService.setRegistrationStep(ctx.from.id, 'ih_awaiting_phone');
-        await ctx.replyWithHTML(
-          `Thank you, <b>${client.fullName}</b>!\n\n` +
-          'Please share your phone number using the button below (or type it):',
-          this.botService.getPhoneShareKeyboard(),
-        );
-        return;
-      }
-
-      await this.clientsService.completeRegistration(client.telegramId, client.phone);
+      await ctx.replyWithHTML(
+        '⚠️ <b>Client Registration Required</b>\n\n' +
+        'Please complete your quick client registration first before booking an Inner Healing session.',
+      );
+      await this.onRegister(ctx);
+      return;
     }
 
     // Client is registered: prompt for optional issue description
@@ -1541,13 +1576,39 @@ export class BotUpdate {
       return;
     }
 
+    // 1. Guard against persistent menu buttons being treated as text/form input
+    const isMenuButton = RESERVED_MENU_BUTTONS.some(
+      (btn) => btn.toLowerCase() === text.toLowerCase(),
+    );
+    if (isMenuButton) {
+      const client = await this.clientsService.findByTelegramId(ctx.from.id);
+      if (client?.registrationStep) {
+        await this.clientsService.setRegistrationStep(ctx.from.id, null);
+      }
+      if (next) {
+        await next();
+      }
+      return;
+    }
+
     const client = await this.clientsService.findByTelegramId(ctx.from.id);
     if (!client) return;
 
-    // Registration step 1: entering name
-    if (client.registrationStep === 'awaiting_name') {
-      if (text.length < 2) {
-        await ctx.replyWithHTML('⚠️ Please enter a valid full name:');
+    // Registration step 1: entering name (or updating name from profile)
+    if (client.registrationStep === 'awaiting_name' || client.registrationStep === 'ih_awaiting_name') {
+      if (text.length < 2 || !/[a-zA-Z\u1200-\u137F]/.test(text)) {
+        await ctx.replyWithHTML('⚠️ Please enter a valid full name with letters:');
+        return;
+      }
+
+      // If already registered and just updating name
+      if (client.isRegistered && client.phone) {
+        await this.clientsService.saveNameAndPromptPhone(client.telegramId, text);
+        await this.clientsService.setRegistrationStep(client.telegramId, null);
+        await ctx.replyWithHTML(
+          `✅ <b>Profile Updated!</b>\n\nYour name has been updated to <b>${text}</b>.`,
+          this.botService.getBottomPersistentKeyboard(true),
+        );
         return;
       }
 
@@ -1555,23 +1616,6 @@ export class BotUpdate {
 
       await ctx.replyWithHTML(
         `Thank you, <b>${text}</b>!\n\nNow please share your phone number using the button below to complete registration:`,
-        this.botService.getPhoneShareKeyboard(),
-      );
-      return;
-    }
-
-    // Inner Healing Registration: Name
-    if (client.registrationStep === 'ih_awaiting_name') {
-      if (text.length < 2) {
-        await ctx.replyWithHTML('⚠️ Please enter a valid full name:');
-        return;
-      }
-
-      await this.clientsService.saveNameAndPromptPhone(client.telegramId, text);
-      await this.clientsService.setRegistrationStep(client.telegramId, 'ih_awaiting_phone');
-
-      await ctx.replyWithHTML(
-        `Thank you, <b>${text}</b>!\n\nPlease share your phone number using the button below (or type it):`,
         this.botService.getPhoneShareKeyboard(),
       );
       return;
