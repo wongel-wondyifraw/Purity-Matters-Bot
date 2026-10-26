@@ -1,0 +1,60 @@
+import { Telegraf, Markup } from 'telegraf';
+import { Client } from '../database/entities/client.entity.js';
+import { PaymentAccountsResponse } from '../features/payment-settings.service.js';
+export declare function generateValidPdfBuffer(title: string, author?: string): Buffer;
+export declare function resolveUploadDiskPath(filePath?: string | null, fallbackFilename?: string): string;
+export declare class BotService {
+    private readonly bot;
+    private readonly logger;
+    constructor(bot: Telegraf<any>);
+    sendDocumentToUser(telegramId: string | number, filePath: string, fileName: string, caption?: string): Promise<boolean>;
+    sendMessageToUser(telegramId: string | number, message: string, extra?: any): Promise<boolean>;
+    broadcastQuestionToChannel(data: {
+        referenceNumber: string;
+        category: string;
+        question: string;
+        answer: string;
+        counselorName?: string | null;
+    }): Promise<{
+        success: boolean;
+        messageId?: number;
+        error?: string;
+    }>;
+    broadcastBotUpdate(telegramIds: string[], version: string, releaseNotes?: string): Promise<{
+        sent: number;
+        failed: number;
+    }>;
+    getWelcomeMessage(client: Client): string;
+    getBottomPersistentKeyboard(isRegistered?: boolean): Markup.Markup<import("@telegraf/types").ReplyKeyboardMarkup>;
+    getMainKeyboard(isRegistered?: boolean): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getServicesMenuMessage(): string;
+    getServicesMenuKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCounselingConcernKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCounselingDescriptionSkipKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCounselingMethodKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCounselingTimeKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCounselingConfirmKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getInnerHealingTopicsKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCoursesListKeyboard(courses: any[], currentPage?: number, pageSize?: number): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCourseActionKeyboard(course: any, enrollment?: any): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCourseModulesReplyKeyboard(course: any, enrollment?: any): Markup.Markup<import("@telegraf/types").ReplyKeyboardMarkup>;
+    getModuleDoneKeyboard(courseId: number, moduleId: number, isCompleted: boolean, nextModuleId?: number | null): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getCoursePaymentInstructions(course: any, accounts: PaymentAccountsResponse): string;
+    getCourseLessonKeyboard(courseId: string, currentDay: number, totalDays: number): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourceFormatsKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourceCategoryKeyboard(items: any[], categoryType?: 'ebook' | 'physical_book'): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourcesMenuKeyboard(catalog: any[]): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourceFreeKeyboard(resourceId: number | string, categoryType?: string, downloadLabel?: string): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourcePurchasedKeyboard(resource: any, categoryType?: string): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getPaidResourceActionKeyboard(orderId: number, categoryType?: string): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getResourceDetailKeyboard(resource: any, hasPurchased: boolean): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getPaymentInstructionsMessage(resourceTitle: string, amount: number, currency: string, orderNumber: string, accounts: PaymentAccountsResponse, resourceDescription?: string, author?: string): string;
+    getPaymentActionKeyboard(orderId: number): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getPhoneShareKeyboard(): Markup.Markup<import("@telegraf/types").ReplyKeyboardMarkup>;
+    getRemoveKeyboard(): Markup.Markup<import("@telegraf/types").ReplyKeyboardRemove>;
+    getHelpMessage(): string;
+    getAboutMessage(): string;
+    getDonationAccountInstructionsMessage(amount: number | null, referenceNumber: string | null, accounts: PaymentAccountsResponse): string;
+    getDonationAmountsKeyboard(): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+    getDonationActionKeyboard(donationId: number): Markup.Markup<import("@telegraf/types").InlineKeyboardMarkup>;
+}

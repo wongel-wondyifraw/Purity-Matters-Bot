@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { Update, Ctx, Start, Help, Command, Action, On, Hears } from 'nestjs-telegraf';
+import { Update, Ctx, Start, Help, Command, Action, On, Hears, Next } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -1427,10 +1427,116 @@ export class BotUpdate {
   }
 
   // ==========================================
+  // DONATIONS FLOW (Telebirr & CBE)
+  // ==========================================
+  @Command('donate')
+  @Action('cmd_donate')
+  @Hears(['💝 Donate', '🎁 Donate', 'Donate', '/donate', /^\s*💝?\s*Donate\s*$/i])
+  async onDonate(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    await ctx.replyWithHTML(
+      this.botService.getDonationAccountInstructionsMessage(null, null, accounts),
+      this.botService.getDonationAmountsKeyboard(),
+    );
+  }
+
+  @Action(/^don_amt_(\d+)$/)
+  async onDonationPresetAmount(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const amount = parseInt((ctx as any).match[1], 10);
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+    const accounts = await this.paymentSettingsService.getFormattedAccounts();
+
+    const donation = await this.donationsService.create({
+      telegramId: ctx.from.id,
+      clientName: client.fullName || client.firstName || 'Friend',
+      clientUsername: ctx.from.username,
+      clientPhone: client.phone,
+      amount,
+    });
+
+    await ctx.replyWithHTML(
+      this.botService.getDonationAccountInstructionsMessage(
+        amount,
+        donation.referenceNumber,
+        accounts,
+      ),
+      this.botService.getDonationActionKeyboard(donation.id),
+    );
+  }
+
+  @Action('don_amt_custom')
+  async onDonationCustomAmount(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
+    await this.clientsService.setRegistrationStep(client.telegramId, 'don_awaiting_amount');
+
+    await ctx.replyWithHTML(
+      '✏️ <b>Enter Donation Amount</b>\n\n' +
+        'Please type the amount in ETB you wish to donate (e.g. <code>300</code> or <code>1500</code>):',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 Back to Donations', 'cmd_donate')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+      ]),
+    );
+  }
+
+  @Action(/^don_paid_(\d+)(?:_(telebirr|cbe|other))?$/)
+  async onDonationPaid(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const match = (ctx as any).match;
+    const donationId = parseInt(match[1], 10);
+    const method = match[2] || 'telebirr';
+
+    const donation = await this.donationsService.markAsDonated(donationId, method);
+
+    await ctx.replyWithHTML(
+      '🙏 <b>Thank You for Your Generous Heart!</b>\n\n' +
+        `Your gift of <b>${donation.amount} ${donation.currency}</b> has been received and submitted for verification.\n\n` +
+        `• <b>Donation Reference:</b> <code>${donation.referenceNumber}</code>\n` +
+        `• <b>Payment Method:</b> <b>${donation.paymentMethod.toUpperCase()}</b>\n` +
+        `• <b>Status:</b> ⏳ <b>Pending Verification</b>\n\n` +
+        `Our administration team will verify your transfer on our console shortly.\n\n` +
+        `<i>"Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver." — 2 Cor 9:7</i>`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
+        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
+      ]),
+    );
+  }
+
+  @Action(/^don_cancel_(\d+)$/)
+  async onDonationCancel(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const match = (ctx as any).match;
+    const donationId = parseInt(match[1], 10);
+    await this.donationsService.delete(donationId);
+
+    await ctx.replyWithHTML(
+      '❌ <b>Donation Cancelled</b>\n\nYou can donate anytime using the 💝 Donate button below.',
+      this.botService.getBottomPersistentKeyboard(),
+    );
+  }
+
+  // ==========================================
   // TEXT MESSAGE HANDLER
   // ==========================================
   @On('text')
-  async onText(@Ctx() ctx: BotContext) {
+  async onText(@Ctx() ctx: BotContext, @Next() next?: () => Promise<void>) {
     if (!ctx.from || !ctx.message || !('text' in ctx.message)) return;
 
     const text = ctx.message.text.trim();
@@ -1599,111 +1705,9 @@ export class BotUpdate {
     }
 
     this.logger.debug(`Received message from ${ctx.from.id}: ${text}`);
-  }
-
-  // ==========================================
-  // DONATIONS FLOW (Telebirr & CBE)
-  // ==========================================
-  @Command('donate')
-  @Action('cmd_donate')
-  @Hears(['💝 Donate', '🎁 Donate', 'Donate', '/donate'])
-  async onDonate(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    if (ctx.callbackQuery) {
-      await ctx.answerCbQuery();
+    if (next) {
+      await next();
     }
-
-    const accounts = await this.paymentSettingsService.getFormattedAccounts();
-
-    await ctx.replyWithHTML(
-      this.botService.getDonationAccountInstructionsMessage(null, null, accounts),
-      this.botService.getDonationAmountsKeyboard(),
-    );
-  }
-
-  @Action(/^don_amt_(\d+)$/)
-  async onDonationPresetAmount(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    await ctx.answerCbQuery();
-
-    const amount = parseInt((ctx as any).match[1], 10);
-    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
-    const accounts = await this.paymentSettingsService.getFormattedAccounts();
-
-    const donation = await this.donationsService.create({
-      telegramId: ctx.from.id,
-      clientName: client.fullName || client.firstName || 'Friend',
-      clientUsername: ctx.from.username,
-      clientPhone: client.phone,
-      amount,
-    });
-
-    await ctx.replyWithHTML(
-      this.botService.getDonationAccountInstructionsMessage(
-        amount,
-        donation.referenceNumber,
-        accounts,
-      ),
-      this.botService.getDonationActionKeyboard(donation.id),
-    );
-  }
-
-  @Action('don_amt_custom')
-  async onDonationCustomAmount(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    await ctx.answerCbQuery();
-
-    const client = await this.clientsService.findOrCreateFromTelegram(ctx.from);
-    await this.clientsService.setRegistrationStep(client.telegramId, 'don_awaiting_amount');
-
-    await ctx.replyWithHTML(
-      '✏️ <b>Enter Donation Amount</b>\n\n' +
-        'Please type the amount in ETB you wish to donate (e.g. <code>300</code> or <code>1500</code>):',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🔙 Back to Donations', 'cmd_donate')],
-        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
-      ]),
-    );
-  }
-
-  @Action(/^don_paid_(\d+)(?:_(telebirr|cbe|other))?$/)
-  async onDonationPaid(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    await ctx.answerCbQuery();
-
-    const match = (ctx as any).match;
-    const donationId = parseInt(match[1], 10);
-    const method = match[2] || 'telebirr';
-
-    const donation = await this.donationsService.markAsDonated(donationId, method);
-
-    await ctx.replyWithHTML(
-      '🙏 <b>Thank You for Your Generous Heart!</b>\n\n' +
-        `Your gift of <b>${donation.amount} ${donation.currency}</b> has been received and submitted for verification.\n\n` +
-        `• <b>Donation Reference:</b> <code>${donation.referenceNumber}</code>\n` +
-        `• <b>Payment Method:</b> <b>${donation.paymentMethod.toUpperCase()}</b>\n` +
-        `• <b>Status:</b> ⏳ <b>Pending Verification</b>\n\n` +
-        `Our administration team will verify your transfer on our console shortly.\n\n` +
-        `<i>"Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver." — 2 Cor 9:7</i>`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
-        [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
-      ]),
-    );
-  }
-
-  @Action(/^don_cancel_(\d+)$/)
-  async onDonationCancel(@Ctx() ctx: BotContext) {
-    if (!ctx.from) return;
-    await ctx.answerCbQuery();
-
-    const match = (ctx as any).match;
-    const donationId = parseInt(match[1], 10);
-    await this.donationsService.delete(donationId);
-
-    await ctx.replyWithHTML(
-      '❌ <b>Donation Cancelled</b>\n\nYou can donate anytime using the 💝 Donate button below.',
-      this.botService.getBottomPersistentKeyboard(),
-    );
   }
 }
+
