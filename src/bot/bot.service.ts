@@ -180,14 +180,17 @@ export class BotService {
   async sendMessageToUser(
     telegramId: string | number,
     message: string,
+    extra?: any,
   ): Promise<boolean> {
     try {
       if (!this.bot?.telegram?.sendMessage) {
         return false;
       }
-      await this.bot.telegram.sendMessage(telegramId, message, {
-        parse_mode: 'HTML',
-      });
+      const opts = {
+        parse_mode: 'HTML' as const,
+        ...(extra || {}),
+      };
+      await this.bot.telegram.sendMessage(telegramId, message, opts);
       return true;
     } catch (err: any) {
       this.logger.error(`Error sending message to ${telegramId}: ${err.message}`, err);
@@ -392,12 +395,136 @@ export class BotService {
   }
 
   // --- C. Training & Courses Keyboards ---
-  getCoursesListKeyboard(courses: CourseDefinition[]) {
-    const buttons = courses.map((course) => [
-      Markup.button.callback(course.title, `crs_view_${course.id}`),
-    ]);
+
+  getCoursesListKeyboard(courses: any[], currentPage = 1, pageSize = 5) {
+    const totalPages = Math.max(1, Math.ceil(courses.length / pageSize));
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIdx = (safePage - 1) * pageSize;
+    const pageItems = courses.slice(startIdx, startIdx + pageSize);
+
+    const buttons: any[] = [];
+
+    // Course buttons
+    for (const course of pageItems) {
+      const isPaid = course.type === 'paid' || (Number(course.price) > 0);
+      const priceTag = isPaid ? `💎 [${course.price} ${course.currency || 'ETB'}]` : '📖 [FREE]';
+      buttons.push([
+        Markup.button.callback(`${priceTag} ${course.name || course.title}`, `crs_sel_${course.id}`),
+      ]);
+    }
+
+    // Pagination row
+    if (totalPages > 1) {
+      const navRow: any[] = [];
+      if (safePage > 1) {
+        navRow.push(Markup.button.callback('« Previous', `crs_page_${safePage - 1}`));
+      }
+      navRow.push(Markup.button.callback(`📄 ${safePage} / ${totalPages}`, 'crs_noop'));
+      if (safePage < totalPages) {
+        navRow.push(Markup.button.callback('Next »', `crs_page_${safePage + 1}`));
+      }
+      buttons.push(navRow);
+    }
+
+    // Return to Services button
     buttons.push([Markup.button.callback('🔙 Return to Services', 'cmd_services')]);
+
     return Markup.inlineKeyboard(buttons);
+  }
+
+  getCourseActionKeyboard(course: any, enrollment?: any) {
+    const buttons: any[] = [];
+    const isPaid = course.type === 'paid' || (Number(course.price) > 0);
+    const hasAccess = !isPaid || enrollment?.paymentStatus === 'confirmed';
+
+    if (hasAccess) {
+      buttons.push([
+        Markup.button.callback('🚀 Enter Course & Start Learning', `crs_open_${course.id}`),
+      ]);
+    } else if (enrollment?.paymentStatus === 'pending_verification') {
+      buttons.push([
+        Markup.button.callback('⏳ Payment Pending Verification', `crs_pending_${course.id}`),
+      ]);
+    } else {
+      // Paid course requiring payment
+      buttons.push([
+        Markup.button.callback('💳 I Have Paid (Submit Verification)', `crs_paid_${course.id}`),
+      ]);
+    }
+
+    buttons.push([Markup.button.callback('🔙 Back to Courses', 'srv_courses')]);
+    return Markup.inlineKeyboard(buttons);
+  }
+
+  getCourseModulesReplyKeyboard(course: any, enrollment?: any) {
+    const modules = [...(course?.modules || [])].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    const completedSet = new Set(enrollment?.completedModuleIds || []);
+
+    const rows: string[][] = [];
+
+    modules.forEach((mod, idx) => {
+      const isCompleted = completedSet.has(mod.id);
+      const isUnlocked = idx === 0 || completedSet.has(modules[idx - 1].id);
+
+      let prefix = '🔒';
+      if (isCompleted) {
+        prefix = '🟢';
+      } else if (isUnlocked) {
+        prefix = '📖';
+      }
+
+      rows.push([`${prefix} ${idx + 1}. ${mod.title}`]);
+    });
+
+    rows.push(['🔙 Exit Course', 'ℹ️ Course Overview']);
+
+    return Markup.keyboard(rows).resize().persistent();
+  }
+
+  getModuleDoneKeyboard(courseId: number, moduleId: number, isCompleted: boolean, nextModuleId?: number | null) {
+    const buttons: any[] = [];
+
+    if (!isCompleted) {
+      buttons.push([
+        Markup.button.callback('✅ Done (Mark Module Complete)', `crs_mod_done_${courseId}_${moduleId}`),
+      ]);
+    } else {
+      buttons.push([
+        Markup.button.callback('✅ Module Completed', `crs_mod_noop_${moduleId}`),
+      ]);
+    }
+
+    if (nextModuleId) {
+      buttons.push([
+        Markup.button.callback('▶️ Next Module', `crs_mod_${courseId}_${nextModuleId}`),
+      ]);
+    }
+
+    buttons.push([
+      Markup.button.callback('📚 Course Overview', `crs_open_${courseId}`),
+    ]);
+
+    return Markup.inlineKeyboard(buttons);
+  }
+
+  getCoursePaymentInstructions(course: any, accounts: PaymentAccountsResponse): string {
+    const formattedPrice = `${course.price} ${course.currency || 'ETB'}`;
+
+    return (
+      `💎 <b>Payment Instructions for ${course.name}</b>\n\n` +
+      `<b>Course Fee:</b> ${formattedPrice}\n\n` +
+      `To gain access to this paid course, please transfer the exact fee using any of our official ministry accounts:\n\n` +
+      `📱 <b>Telebirr</b>\n` +
+      `• Account: <code>${accounts.telebirr.accountNumber}</code>\n` +
+      `• Account Name: <b>${accounts.telebirr.accountName}</b>\n\n` +
+      `🏦 <b>Commercial Bank of Ethiopia (CBE)</b>\n` +
+      `• Account: <code>${accounts.cbe.accountNumber}</code>\n` +
+      `• Account Name: <b>${accounts.cbe.accountName}</b>\n\n` +
+      `📌 <b>Next Steps:</b>\n` +
+      `1. Complete the transfer through Telebirr or CBE.\n` +
+      `2. Click the <b>"💳 I Have Paid"</b> button below.\n` +
+      `3. Our team will verify your transfer and immediately activate your course access.`
+    );
   }
 
   getCourseLessonKeyboard(courseId: string, currentDay: number, totalDays: number) {

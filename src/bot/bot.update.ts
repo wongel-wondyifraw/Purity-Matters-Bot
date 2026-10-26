@@ -2,12 +2,14 @@ import { Logger } from '@nestjs/common';
 import { Update, Ctx, Start, Help, Command, Action, On, Hears } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
 import * as path from 'path';
+import * as fs from 'fs';
 import type { BotContext } from './bot.interface.js';
 import { BotService, resolveUploadDiskPath } from './bot.service.js';
 import { ClientsService } from '../clients/clients.service.js';
 import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
+import { CourseEnrollmentsService } from '../features/course-enrollments.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
 import { DonationsService } from '../features/donations.service.js';
@@ -22,6 +24,7 @@ export class BotUpdate {
     private readonly counselingService: CounselingService,
     private readonly innerHealingService: InnerHealingService,
     private readonly coursesService: CoursesService,
+    private readonly courseEnrollmentsService: CourseEnrollmentsService,
     private readonly resourcesService: ResourcesService,
     private readonly paymentSettingsService: PaymentSettingsService,
     private readonly donationsService: DonationsService,
@@ -460,8 +463,10 @@ export class BotUpdate {
   }
 
   // ==========================================
-  // C. TRAINING & COURSES FLOW
   // ==========================================
+  // C. TRAINING & COURSES FLOW (Dynamic Curriculum & Progression)
+  // ==========================================
+
   @Action('srv_courses')
   @Hears(['📚 Training & Courses', '📚 C. Training & Courses', '📚 Courses'])
   async onSrvCourses(@Ctx() ctx: BotContext) {
@@ -470,81 +475,484 @@ export class BotUpdate {
       await ctx.answerCbQuery();
     }
 
-    const courses = this.coursesService.getCourses();
+    const courses = await this.coursesService.findAllCourses({ type: 'all' });
+    if (!courses || courses.length === 0) {
+      const client = await this.clientsService.findByTelegramId(ctx.from.id);
+      await ctx.replyWithHTML(
+        '📚 <b>Training & Transformation Courses</b>\n\n' +
+        'There are no courses currently published. Please check back soon!',
+        this.botService.getBottomPersistentKeyboard(client?.isRegistered ?? false),
+      );
+      return;
+    }
+
     await ctx.replyWithHTML(
-      '📚 <b>Training & Transformation Journeys</b>\n\n' +
-      'Choose a journey below to start reading daily lessons, identify personal triggers, and track progress:',
-      this.botService.getCoursesListKeyboard(courses),
+      '📚 <b>Training & Courses</b>\n\n' +
+      'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+      '<i>Select a course to view details and begin:</i>',
+      this.botService.getCoursesListKeyboard(courses, 1, 5),
     );
   }
 
-  @Action(/^crs_view_(.+)$/)
-  async onCrsView(@Ctx() ctx: BotContext) {
+  @Action(/^crs_page_(\d+)$/)
+  async onCrsPage(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
-    const courseId = (ctx as any).match[1];
-    const course = this.coursesService.getCourse(courseId);
+    const page = parseInt((ctx as any).match[1], 10) || 1;
+    const courses = await this.coursesService.findAllCourses({ type: 'all' });
+
+    try {
+      await ctx.editMessageText(
+        '📚 <b>Training & Courses</b>\n\n' +
+        'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+        '<i>Select a course to view details and begin:</i>',
+        {
+          parse_mode: 'HTML',
+          ...this.botService.getCoursesListKeyboard(courses, page, 5),
+        },
+      );
+    } catch {
+      await ctx.replyWithHTML(
+        '📚 <b>Training & Courses</b>\n\n' +
+        'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+        '<i>Select a course to view details and begin:</i>',
+        this.botService.getCoursesListKeyboard(courses, page, 5),
+      );
+    }
+  }
+
+  @Action(/^crs_sel_(\d+)$/)
+  async onCrsSel(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    await ctx.answerCbQuery();
+
+    const courseId = parseInt((ctx as any).match[1], 10);
+    const course = await this.coursesService.findCourseById(courseId);
     if (!course) {
       await ctx.replyWithHTML('⚠️ Course not found.');
       return;
     }
 
-    const progress = await this.coursesService.getProgress(ctx.from.id, courseId);
-    const day = progress.currentDay;
-    const lesson = course.lessons[day] ?? course.lessons[1];
+    const enrollment = await this.courseEnrollmentsService.getEnrollment(ctx.from.id, courseId);
+    const isPaid = course.type === 'paid' || Number(course.price) > 0;
+    const hasAccess = !isPaid || enrollment?.paymentStatus === 'confirmed';
 
     let message =
-      `📖 <b>${course.title}</b>\n\n` +
-      `🗓️ <b>Day ${lesson.day}: ${lesson.title}</b>\n\n` +
-      `📜 <b>Scripture:</b> ${lesson.scripture}\n\n` +
-      `💡 <b>Lesson:</b> ${lesson.teaching}\n\n` +
-      `🎯 <b>Reflection & Triggers:</b> ${lesson.reflectionQuestion}\n\n` +
-      `⚡ <b>Practical Action:</b> ${lesson.practicalAction}\n\n` +
-      `📊 <b>Progress:</b> Day ${progress.currentDay} of ${progress.totalDays} (${progress.completedDays.length} days completed)`;
+      `📖 <b>${course.name}</b>\n\n` +
+      `🏷️ <b>Theme:</b> ${course.theme}\n` +
+      `💰 <b>Access:</b> ${isPaid ? `${course.price} ${course.currency || 'ETB'}` : 'FREE'}\n` +
+      `📚 <b>Curriculum:</b> ${course.modules?.length || 0} sequential modules\n\n`;
 
-    if (progress.accountabilityRequested) {
-      message += `\n🤝 <b>Accountability Partner:</b> Assigned/Active`;
+    if (course.description) {
+      message += `📝 <b>Overview:</b>\n${course.description}\n\n`;
     }
 
-    await ctx.replyWithHTML(
-      message,
-      this.botService.getCourseLessonKeyboard(courseId, lesson.day, course.durationDays),
-    );
+    if (course.generalObjective) {
+      message += `🎯 <b>General Objective:</b>\n${course.generalObjective}\n\n`;
+    }
+
+    if (course.learningOutcomes && course.learningOutcomes.length > 0) {
+      message += `✨ <b>Learning Outcomes:</b>\n` +
+        course.learningOutcomes.map((item: string) => `• ${item}`).join('\n') + '\n\n';
+    }
+
+    if (enrollment) {
+      if (enrollment.paymentStatus === 'confirmed') {
+        const completedCount = enrollment.completedModuleIds?.length || 0;
+        const total = course.modules?.length || 0;
+        const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+        message += `📊 <b>Your Progress:</b> ${completedCount}/${total} modules (${pct}% complete)\n\n`;
+      } else if (enrollment.paymentStatus === 'pending_verification') {
+        message += `⏳ <b>Payment Status:</b> Pending Administrator Verification\n\n`;
+      } else if (enrollment.paymentStatus === 'rejected') {
+        message += `⚠️ <b>Payment Status:</b> Verification could not be confirmed. (${enrollment.adminNotes || 'Please retry transfer'})\n\n`;
+      }
+    }
+
+    // If paid and not verified, attach payment instructions
+    if (isPaid && !hasAccess && enrollment?.paymentStatus !== 'pending_verification') {
+      const accounts = await this.paymentSettingsService.getPaymentAccounts();
+      message += this.botService.getCoursePaymentInstructions(course, accounts);
+    }
+
+    await ctx.replyWithHTML(message, this.botService.getCourseActionKeyboard(course, enrollment));
   }
 
-  @Action(/^crs_complete_(.+)_(.+)$/)
-  async onCrsComplete(@Ctx() ctx: BotContext) {
+  @Action(/^crs_paid_(\d+)$/)
+  async onCrsPaid(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
-    const courseId = (ctx as any).match[1];
-    const day = parseInt((ctx as any).match[2], 10);
+    const courseId = parseInt((ctx as any).match[1], 10);
+    const course = await this.coursesService.findCourseById(courseId);
+    if (!course) {
+      await ctx.replyWithHTML('⚠️ Course not found.');
+      return;
+    }
 
-    const progress = await this.coursesService.markDayComplete(ctx.from.id, courseId, day);
+    const clientName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.username || 'Student';
+
+    await this.courseEnrollmentsService.submitPaymentRequest({
+      telegramId: ctx.from.id,
+      clientName,
+      clientUsername: ctx.from.username || null,
+      courseId: course.id,
+      courseName: course.name,
+      amount: Number(course.price) || 0,
+      currency: course.currency || 'ETB',
+    });
+
     await ctx.replyWithHTML(
-      `🎉 <b>Congratulations! You have completed Day ${day}!</b>\n\n` +
-      `Total Days Completed: ${progress.completedDays.length}/${progress.totalDays}.\n` +
-      'Keep up the dedication to your spiritual and mental growth!',
+      `⏳ <b>Payment Verification Submitted!</b>\n\n` +
+      `Thank you! We have received your payment verification request for <b>${course.name}</b> (${course.price} ${course.currency || 'ETB'}).\n\n` +
+      `Our administration team will verify your transfer in our Telebirr / CBE statements shortly.\n\n` +
+      `Once confirmed, you will receive an automated notification right here in Telegram with direct access to begin your studies.\n\n` +
+      `<i>Status: Pending Verification</i>`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 Back to Courses', 'srv_courses')],
+      ]),
     );
-
-    // Refresh course view
-    (ctx as any).match = [null, courseId];
-    await this.onCrsView(ctx);
   }
 
-  @Action(/^crs_acc_(.+)$/)
-  async onCrsAcc(@Ctx() ctx: BotContext) {
+  @Action(/^crs_open_(\d+)$/)
+  async onCrsOpen(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    const courseId = parseInt((ctx as any).match[1], 10);
+    await this.renderCourseOverview(ctx, courseId);
+  }
+
+  async renderCourseOverview(ctx: BotContext, courseId: number) {
+    if (!ctx.from) return;
+
+    const course = await this.coursesService.findCourseById(courseId);
+    if (!course) {
+      await ctx.replyWithHTML('⚠️ Course not found.');
+      return;
+    }
+
+    let enrollment = await this.courseEnrollmentsService.getEnrollment(ctx.from.id, courseId);
+    const isPaid = course.type === 'paid' || Number(course.price) > 0;
+
+    if (isPaid && (!enrollment || enrollment.paymentStatus !== 'confirmed')) {
+      await ctx.replyWithHTML(
+        '⚠️ <b>Access Restricted</b>\n\nThis paid course requires administrator verification before access is granted.',
+        Markup.inlineKeyboard([[Markup.button.callback('💳 View Payment Instructions', `crs_sel_${courseId}`)]]),
+      );
+      return;
+    }
+
+    // Auto-enroll free course if not yet enrolled
+    if (!enrollment) {
+      const clientName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.username || 'Student';
+      enrollment = await this.courseEnrollmentsService.enrollFreeCourse({
+        telegramId: ctx.from.id,
+        clientName,
+        clientUsername: ctx.from.username || null,
+        courseId: course.id,
+        courseName: course.name,
+      });
+    }
+
+    const modules = [...(course.modules || [])].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    const completedSet = new Set(enrollment.completedModuleIds || []);
+
+    let overviewMsg =
+      `📖 <b>${course.name} — Learning Interface</b>\n\n` +
+      `🏷️ <b>Theme:</b> ${course.theme}\n\n`;
+
+    if (course.description) {
+      overviewMsg += `📝 <b>Overview:</b>\n${course.description}\n\n`;
+    }
+
+    if (course.generalObjective) {
+      overviewMsg += `🎯 <b>General Objective:</b>\n${course.generalObjective}\n\n`;
+    }
+
+    if (course.learningOutcomes && course.learningOutcomes.length > 0) {
+      overviewMsg += `✨ <b>Learning Outcomes:</b>\n` +
+        course.learningOutcomes.map((item: string) => `• ${item}`).join('\n') + '\n\n';
+    }
+
+    overviewMsg += `📚 <b>Curriculum & Progress:</b>\n`;
+    if (modules.length === 0) {
+      overviewMsg += `<i>No modules have been published for this course yet.</i>\n`;
+    } else {
+      modules.forEach((mod, idx) => {
+        const isCompleted = completedSet.has(mod.id);
+        const isUnlocked = idx === 0 || completedSet.has(modules[idx - 1].id);
+        const icon = isCompleted ? '🟢' : isUnlocked ? '📖' : '🔒';
+        const statusText = isCompleted ? 'Completed' : isUnlocked ? 'Unlocked' : 'Locked';
+        overviewMsg += `${icon} <b>Module ${idx + 1}:</b> ${mod.title} (<i>${statusText}</i>)\n`;
+      });
+    }
+
+    overviewMsg += `\n<i>Use the persistent keyboard below to navigate modules at any time, or click below:</i>`;
+
+    const nextMod = modules.find((m) => !completedSet.has(m.id)) || modules[0];
+
+    const inlineButtons: any[] = [];
+    if (nextMod) {
+      inlineButtons.push([
+        Markup.button.callback(`▶️ Open: ${nextMod.title}`, `crs_mod_${course.id}_${nextMod.id}`),
+      ]);
+    }
+    inlineButtons.push([
+      Markup.button.callback('🔙 Back to Courses', 'srv_courses'),
+    ]);
+
+    await ctx.replyWithHTML(
+      overviewMsg,
+      this.botService.getCourseModulesReplyKeyboard(course, enrollment),
+    );
+
+    if (inlineButtons.length > 0) {
+      await ctx.reply(
+        'Action:',
+        Markup.inlineKeyboard(inlineButtons),
+      );
+    }
+  }
+
+  @Action(/^crs_mod_(\d+)_(\d+)$/)
+  async onCrsMod(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    const courseId = parseInt((ctx as any).match[1], 10);
+    const moduleId = parseInt((ctx as any).match[2], 10);
+
+    await this.renderModuleView(ctx, courseId, moduleId);
+  }
+
+  async renderModuleView(ctx: BotContext, courseId: number, moduleId: number) {
+    if (!ctx.from) return;
+
+    const course = await this.coursesService.findCourseById(courseId);
+    const enrollment = await this.courseEnrollmentsService.getEnrollment(ctx.from.id, courseId);
+    const isPaid = course.type === 'paid' || Number(course.price) > 0;
+
+    if (isPaid && (!enrollment || enrollment.paymentStatus !== 'confirmed')) {
+      await ctx.replyWithHTML('⚠️ Access restricted. Please complete payment verification.');
+      return;
+    }
+
+    const modules = [...(course.modules || [])].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    const modIndex = modules.findIndex((m) => m.id === moduleId);
+    if (modIndex === -1) {
+      await ctx.replyWithHTML('⚠️ Module not found.');
+      return;
+    }
+
+    const completedSet = new Set(enrollment?.completedModuleIds || []);
+    const isUnlocked = modIndex === 0 || completedSet.has(modules[modIndex - 1].id) || completedSet.has(moduleId);
+
+    if (!isUnlocked) {
+      await ctx.replyWithHTML(
+        '🔒 <b>Module Locked</b>\n\n' +
+        'Please complete the preceding module first before unlocking this module.',
+      );
+      return;
+    }
+
+    const module = await this.coursesService.findModuleWithSections(moduleId);
+    if (!module) {
+      await ctx.replyWithHTML('⚠️ Module details not found.');
+      return;
+    }
+
+    const sections = [...(module.sections || [])].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+
+    let moduleHeader = `📖 <b>Module ${modIndex + 1}: ${module.title}</b>\n\n`;
+    if (module.description) {
+      moduleHeader += `📝 ${module.description}\n\n`;
+    }
+    if (sections.length > 0) {
+      moduleHeader += `<b>Sections (${sections.length}):</b>\n`;
+      sections.forEach((sec, sIdx) => {
+        moduleHeader += `• Section ${sIdx + 1}: ${sec.title}\n`;
+      });
+    }
+
+    await ctx.replyWithHTML(moduleHeader);
+
+    for (let i = 0; i < sections.length; i++) {
+      const sec = sections[i];
+      let secMsg = `📌 <b>Section ${i + 1}: ${sec.title}</b>\n\n`;
+      if (sec.additionalContent) {
+        secMsg += `${sec.additionalContent}\n\n`;
+      }
+      await ctx.replyWithHTML(secMsg);
+
+      if (sec.materials && sec.materials.length > 0) {
+        for (const mat of sec.materials) {
+          const diskPath = resolveUploadDiskPath(mat.filePath, mat.fileName);
+          try {
+            if (fs.existsSync(diskPath)) {
+              const isAudio = mat.fileType === 'audio' || mat.fileMimeType?.startsWith('audio/');
+              if (isAudio) {
+                await ctx.replyWithAudio(
+                  { source: fs.readFileSync(diskPath), filename: mat.fileName },
+                  { caption: `🎧 <b>${mat.title}</b>`, parse_mode: 'HTML' },
+                );
+              } else {
+                await ctx.replyWithDocument(
+                  { source: fs.readFileSync(diskPath), filename: mat.fileName },
+                  { caption: `📎 <b>${mat.title}</b>`, parse_mode: 'HTML' },
+                );
+              }
+            } else {
+              await ctx.replyWithHTML(`📎 <b>Resource Material:</b> ${mat.title} (<i>${mat.fileName}</i>)`);
+            }
+          } catch (fileErr) {
+            this.logger.warn(`Could not dispatch material ${mat.fileName}:`, fileErr);
+            await ctx.replyWithHTML(`📎 <b>Resource Material:</b> ${mat.title}`);
+          }
+        }
+      }
+    }
+
+    const isCompleted = completedSet.has(moduleId);
+    const nextModId = modIndex < modules.length - 1 ? modules[modIndex + 1].id : null;
+
+    await ctx.replyWithHTML(
+      isCompleted
+        ? `🟢 <i>You have already completed Module ${modIndex + 1}. You can review it anytime!</i>`
+        : `👉 <i>When you have finished reviewing this module, click below to mark it as complete and unlock the next module:</i>`,
+      this.botService.getModuleDoneKeyboard(courseId, moduleId, isCompleted, isCompleted ? nextModId : null),
+    );
+  }
+
+  @Action(/^crs_mod_done_(\d+)_(\d+)$/)
+  async onCrsModDone(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
-    const courseId = (ctx as any).match[1];
-    await this.coursesService.requestAccountability(ctx.from.id, courseId);
+    const courseId = parseInt((ctx as any).match[1], 10);
+    const moduleId = parseInt((ctx as any).match[2], 10);
 
+    const result = await this.courseEnrollmentsService.completeModule(ctx.from.id, courseId, moduleId);
+    const course = await this.coursesService.findCourseById(courseId);
+
+    const replyKb = this.botService.getCourseModulesReplyKeyboard(course, result.enrollment);
+
+    if (result.isCourseCompleted) {
+      await ctx.replyWithHTML(
+        `🏆 <b>Hallelujah! Course Completed!</b>\n\n` +
+        `Congratulations! You have completed all modules in <b>${course.name}</b>!\n\n` +
+        `May God continue to bless your journey of purity, holiness, and purpose.\n\n` +
+        `All modules remain unlocked and accessible for your lifelong review.`,
+        replyKb,
+      );
+    } else if (result.nextModule) {
+      await ctx.replyWithHTML(
+        `✅ <b>Module Complete!</b>\n\n` +
+        `You have successfully completed this module!\n\n` +
+        `Module <b>${result.nextModule.title}</b> is now unlocked.\n\n` +
+        `Click below or select it from the persistent keyboard to continue:`,
+        replyKb,
+      );
+
+      await ctx.reply(
+        'Next Module:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback(`▶️ Open: ${result.nextModule.title}`, `crs_mod_${courseId}_${result.nextModule.id}`)],
+          [Markup.button.callback('📚 Course Overview', `crs_open_${courseId}`)],
+        ]),
+      );
+    } else {
+      await ctx.replyWithHTML(
+        `✅ <b>Module Complete!</b>\n\nGreat progress! Your completion has been saved.`,
+        replyKb,
+      );
+    }
+  }
+
+  @Hears(/^([🟢📖🔒])\s*(\d+)\.\s*(.+)$/)
+  async onCourseModuleTextSelect(@Ctx() ctx: BotContext) {
+    if (!ctx.from || !ctx.message || !('text' in ctx.message)) return;
+    const match = ctx.message.text.match(/^([🟢📖🔒])\s*(\d+)\.\s*(.+)$/);
+    if (!match) return;
+
+    const icon = match[1];
+    const moduleIndex = parseInt(match[2], 10) - 1;
+    const moduleTitle = match[3].trim();
+
+    const enrollments = await this.courseEnrollmentsService.getUserEnrollments(ctx.from.id);
+    if (!enrollments.length) {
+      await ctx.replyWithHTML('⚠️ You are not currently enrolled in any course. Please browse 📚 Training & Courses.');
+      return;
+    }
+
+    const activeEnrollment = enrollments.find(e => e.status === 'in_progress' || e.paymentStatus === 'confirmed') || enrollments[0];
+    const course = await this.coursesService.findCourseById(activeEnrollment.courseId);
+    const sortedModules = [...(course.modules || [])].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+
+    const selectedMod = sortedModules[moduleIndex] || sortedModules.find(m => m.title.trim() === moduleTitle);
+    if (!selectedMod) {
+      await ctx.replyWithHTML('⚠️ Module not found.');
+      return;
+    }
+
+    if (icon === '🔒') {
+      await ctx.replyWithHTML(
+        '🔒 <b>Module Locked</b>\n\n' +
+        'This module is not yet unlocked. Please complete the preceding module first to unlock this content.',
+      );
+      return;
+    }
+
+    await this.renderModuleView(ctx, course.id, selectedMod.id);
+  }
+
+  @Hears(['ℹ️ Course Overview', 'Course Overview'])
+  async onCourseOverviewText(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    const enrollments = await this.courseEnrollmentsService.getUserEnrollments(ctx.from.id);
+    if (!enrollments.length) {
+      await ctx.replyWithHTML('⚠️ You are not currently enrolled in any course. Please browse 📚 Training & Courses.');
+      return;
+    }
+    const activeEnrollment = enrollments.find(e => e.status === 'in_progress' || e.paymentStatus === 'confirmed') || enrollments[0];
+    await this.renderCourseOverview(ctx, activeEnrollment.courseId);
+  }
+
+  @Hears(['🔙 Exit Course', 'Exit Course'])
+  async onExitCourseText(@Ctx() ctx: BotContext) {
+    if (!ctx.from) return;
+    const client = await this.clientsService.findByTelegramId(ctx.from.id);
     await ctx.replyWithHTML(
-      '🤝 <b>Accountability Request Logged!</b>\n\n' +
-      'An accountability leader has been notified and will connect with you to encourage and support your journey.',
+      '👋 <b>Exited Course View</b>\n\n' +
+      'You have returned to the main menu. Your learning progress is safely saved. You can resume anytime under <b>📚 Training & Courses</b>.',
+      this.botService.getBottomPersistentKeyboard(client?.isRegistered ?? false),
     );
+  }
+
+  @Action('crs_noop')
+  async onCrsNoop(@Ctx() ctx: BotContext) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+  }
+
+  @Action(/^crs_pending_(\d+)$/)
+  async onCrsPending(@Ctx() ctx: BotContext) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery('Payment verification pending. Our team will verify your transfer shortly.', { show_alert: true });
+    }
+  }
+
+  @Action(/^crs_mod_noop_(\d+)$/)
+  async onCrsModNoop(@Ctx() ctx: BotContext) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery('Module already completed.', { show_alert: false });
+    }
   }
 
   // ==========================================

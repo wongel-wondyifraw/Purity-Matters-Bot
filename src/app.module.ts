@@ -14,6 +14,11 @@ import { AnonymousQuestion } from './database/entities/anonymous-question.entity
 import { PaymentSetting } from './database/entities/payment-setting.entity.js';
 import { ResourceOrder } from './database/entities/resource-order.entity.js';
 import { Donation } from './database/entities/donation.entity.js';
+import { Course } from './database/entities/course.entity.js';
+import { CourseModule } from './database/entities/course-module.entity.js';
+import { CourseSection } from './database/entities/course-section.entity.js';
+import { CourseMaterial } from './database/entities/course-material.entity.js';
+import { CourseEnrollment } from './database/entities/course-enrollment.entity.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { FeaturesModule } from './features/features.module.js';
 import { BotModule } from './bot/bot.module.js';
@@ -51,6 +56,11 @@ import { AppService } from './app.service.js';
           PaymentSetting,
           ResourceOrder,
           Donation,
+          Course,
+          CourseModule,
+          CourseSection,
+          CourseMaterial,
+          CourseEnrollment,
         ],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),

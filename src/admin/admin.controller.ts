@@ -21,6 +21,7 @@ import { ClientsService } from '../clients/clients.service.js';
 import { CounselingService } from '../features/counseling.service.js';
 import { InnerHealingService } from '../features/inner-healing.service.js';
 import { CoursesService } from '../features/courses.service.js';
+import { CourseEnrollmentsService } from '../features/course-enrollments.service.js';
 import { ResourcesService } from '../features/resources.service.js';
 import { AnonymousQuestionsService } from '../features/anonymous-questions.service.js';
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
@@ -36,6 +37,7 @@ export class AdminController {
     private readonly counselingService: CounselingService,
     private readonly innerHealingService: InnerHealingService,
     private readonly coursesService: CoursesService,
+    private readonly courseEnrollmentsService: CourseEnrollmentsService,
     private readonly resourcesService: ResourcesService,
     private readonly questionsService: AnonymousQuestionsService,
     private readonly paymentSettingsService: PaymentSettingsService,
@@ -277,6 +279,356 @@ export class AdminController {
         phone: client?.phone || 'N/A',
       };
     });
+  }
+
+  // ==========================================
+  // COURSES MANAGEMENT (Full Curriculum Hierarchy)
+  // ==========================================
+
+  @Get('courses/catalog')
+  async getCoursesCatalog(@Query() query: any) {
+    return this.coursesService.findAllCourses(query);
+  }
+
+  @Get('courses/catalog/:id')
+  async getCourseDetails(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.findCourseById(id);
+  }
+
+  @Post('courses/catalog')
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/temp');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `temp-${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async createCourse(
+    @Body() body: any,
+    @UploadedFile() bannerFile?: Express.Multer.File,
+  ) {
+    if (!body || !body.name || !body.theme) {
+      throw new BadRequestException('Course name and theme are required.');
+    }
+
+    let learningOutcomes = body.learningOutcomes;
+    if (typeof learningOutcomes === 'string') {
+      try {
+        learningOutcomes = JSON.parse(learningOutcomes);
+      } catch {
+        learningOutcomes = learningOutcomes.split('\n').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+
+    return this.coursesService.createCourse(
+      {
+        name: body.name,
+        type: body.type || 'free',
+        price: Number(body.price) || 0,
+        currency: body.currency || 'ETB',
+        theme: body.theme,
+        description: body.description || null,
+        generalObjective: body.generalObjective || null,
+        learningOutcomes: Array.isArray(learningOutcomes) ? learningOutcomes : [],
+        orderIndex: Number(body.orderIndex) || 0,
+        bannerImage: body.bannerImage || null,
+      },
+      bannerFile,
+    );
+  }
+
+  @Patch('courses/catalog/:id')
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/temp');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `temp-${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async updateCourse(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @UploadedFile() bannerFile?: Express.Multer.File,
+  ) {
+    let learningOutcomes = body.learningOutcomes;
+    if (typeof learningOutcomes === 'string') {
+      try {
+        learningOutcomes = JSON.parse(learningOutcomes);
+      } catch {
+        learningOutcomes = learningOutcomes.split('\n').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+
+    const payload = { ...body };
+    if (learningOutcomes !== undefined) {
+      payload.learningOutcomes = learningOutcomes;
+    }
+
+    return this.coursesService.updateCourse(id, payload, bannerFile);
+  }
+
+  @Delete('courses/catalog/:id')
+  async deleteCourse(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.coursesService.deleteCourse(id);
+    if (!success) {
+      throw new NotFoundException(`Course #${id} not found.`);
+    }
+    return { success: true, message: `Course #${id} deleted successfully.` };
+  }
+
+  // --- Module Endpoints ---
+
+  @Post('courses/catalog/:courseId/modules')
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/temp');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `temp-mod-${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async createModule(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Body() body: any,
+    @UploadedFile() bannerFile?: Express.Multer.File,
+  ) {
+    if (!body || !body.title) {
+      throw new BadRequestException('Module title is required.');
+    }
+    return this.coursesService.createModule(courseId, body, bannerFile);
+  }
+
+  @Patch('courses/catalog/:courseId/modules/:moduleId')
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/temp');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `temp-mod-${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async updateModule(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('moduleId', ParseIntPipe) moduleId: number,
+    @Body() body: any,
+    @UploadedFile() bannerFile?: Express.Multer.File,
+  ) {
+    return this.coursesService.updateModule(courseId, moduleId, body, bannerFile);
+  }
+
+  @Delete('courses/catalog/:courseId/modules/:moduleId')
+  async deleteModule(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('moduleId', ParseIntPipe) moduleId: number,
+  ) {
+    const success = await this.coursesService.deleteModule(courseId, moduleId);
+    if (!success) {
+      throw new NotFoundException(`Module #${moduleId} not found.`);
+    }
+    return { success: true, message: `Module #${moduleId} deleted successfully.` };
+  }
+
+  // --- Section Endpoints ---
+
+  @Post('courses/catalog/:courseId/modules/:moduleId/sections')
+  async createSection(
+    @Param('moduleId', ParseIntPipe) moduleId: number,
+    @Body() body: any,
+  ) {
+    if (!body || !body.title) {
+      throw new BadRequestException('Section title is required.');
+    }
+    return this.coursesService.createSection(moduleId, body);
+  }
+
+  @Patch('courses/catalog/sections/:sectionId')
+  async updateSection(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() body: any,
+  ) {
+    return this.coursesService.updateSection(sectionId, body);
+  }
+
+  @Delete('courses/catalog/sections/:sectionId')
+  async deleteSection(@Param('sectionId', ParseIntPipe) sectionId: number) {
+    const success = await this.coursesService.deleteSection(sectionId);
+    if (!success) {
+      throw new NotFoundException(`Section #${sectionId} not found.`);
+    }
+    return { success: true, message: `Section #${sectionId} deleted successfully.` };
+  }
+
+  // --- Learning Materials Endpoints ---
+
+  @Post('courses/catalog/:courseId/modules/:moduleId/sections/:sectionId/materials')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, file: any, cb: any) => {
+          const dir = path.resolve(process.cwd(), 'uploads/temp');
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req: any, file: any, cb: any) => {
+          const clean = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `temp-mat-${Date.now()}-${clean}`);
+        },
+      }),
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+    }),
+  )
+  async uploadSectionMaterial(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @Param('moduleId', ParseIntPipe) moduleId: number,
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() body: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided for upload.');
+    }
+    return this.coursesService.uploadMaterial(
+      courseId,
+      moduleId,
+      sectionId,
+      file,
+      body.title,
+    );
+  }
+
+  @Delete('courses/catalog/materials/:materialId')
+  async deleteMaterial(@Param('materialId', ParseIntPipe) materialId: number) {
+    const success = await this.coursesService.deleteMaterial(materialId);
+    if (!success) {
+      throw new NotFoundException(`Material #${materialId} not found.`);
+    }
+    return { success: true, message: `Material #${materialId} deleted successfully.` };
+  }
+
+  // ==========================================
+  // COURSE ENROLMENTS & PROGRESS MANAGEMENT
+  // ==========================================
+
+  @Get('courses/enrollments')
+  async getCourseEnrollments(
+    @Query('courseId') courseId?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    const parsedCourseId = courseId ? parseInt(courseId, 10) : undefined;
+    return this.courseEnrollmentsService.findAll({
+      courseId: isNaN(parsedCourseId!) ? undefined : parsedCourseId,
+      paymentStatus,
+      status,
+      search,
+    });
+  }
+
+  @Get('courses/enrollments/:id')
+  async getCourseEnrollmentById(@Param('id', ParseIntPipe) id: number) {
+    return this.courseEnrollmentsService.findById(id);
+  }
+
+  @Post('courses/enrollments/:id/verify')
+  async verifyCourseEnrollment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { adminNotes?: string },
+  ) {
+    const enrollment = await this.courseEnrollmentsService.verifyPayment(id, body?.adminNotes);
+
+    // Send Telegram notification with direct "🚀 Open Course" button
+    const openKeyboard = {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '🚀 Open Course Now',
+              callback_data: `crs_open_${enrollment.courseId}`,
+            },
+          ],
+        ],
+      },
+    };
+
+    const notificationText =
+      `🎉 <b>Payment Approved! Access Granted!</b>\n\n` +
+      `Your payment for <b>${enrollment.courseName}</b> has been verified by our ministry team!\n\n` +
+      `Your course access is now permanently unlocked. You can begin exploring the modules and lessons right away.`;
+
+    await this.botService.sendMessageToUser(enrollment.telegramId, notificationText, openKeyboard);
+
+    return {
+      success: true,
+      enrollment,
+      message: `Course enrollment #${id} verified and user notified.`,
+    };
+  }
+
+  @Post('courses/enrollments/:id/reject')
+  async rejectCourseEnrollment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { reason?: string },
+  ) {
+    const reason = body?.reason?.trim() || 'Payment could not be verified.';
+    const enrollment = await this.courseEnrollmentsService.rejectPayment(id, reason);
+
+    const notificationText =
+      `⚠️ <b>Course Payment Notice</b>\n\n` +
+      `Our team could not verify the transfer for <b>${enrollment.courseName}</b>.\n\n` +
+      `<b>Reason:</b> ${reason}\n\n` +
+      `Please check your transaction in your Telebirr / CBE app or contact our team if you need assistance.`;
+
+    await this.botService.sendMessageToUser(enrollment.telegramId, notificationText);
+
+    return {
+      success: true,
+      enrollment,
+      message: `Course enrollment #${id} rejected.`,
+    };
+  }
+
+  @Delete('courses/enrollments/:id')
+  async deleteCourseEnrollment(@Param('id', ParseIntPipe) id: number) {
+    const success = await this.courseEnrollmentsService.deleteEnrollment(id);
+    if (!success) {
+      throw new NotFoundException(`Enrollment #${id} not found.`);
+    }
+    return { success: true, message: `Enrollment #${id} deleted successfully.` };
   }
 
   // ==========================================
