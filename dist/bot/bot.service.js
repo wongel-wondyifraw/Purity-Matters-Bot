@@ -627,11 +627,7 @@ let BotService = BotService_1 = class BotService {
     }
     getDonationActionKeyboard(donationId) {
         return Markup.inlineKeyboard([
-            [
-                Markup.button.callback('✅ I Have Donated (Telebirr)', `don_paid_${donationId}_telebirr`),
-                Markup.button.callback('✅ I Have Donated (CBE)', `don_paid_${donationId}_cbe`),
-            ],
-            [Markup.button.callback('✅ I Have Donated', `don_paid_${donationId}_other`)],
+            [Markup.button.callback('✅ I Have Donated', `don_paid_${donationId}`)],
             [Markup.button.callback('❌ Cancel Donation', `don_cancel_${donationId}`)],
         ]);
     }

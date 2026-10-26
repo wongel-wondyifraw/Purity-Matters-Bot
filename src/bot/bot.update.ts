@@ -1491,25 +1491,22 @@ export class BotUpdate {
     );
   }
 
-  @Action(/^don_paid_(\d+)(?:_(telebirr|cbe|other))?$/)
+  @Action(/^don_paid_(\d+)(?:_.*)?$/)
   async onDonationPaid(@Ctx() ctx: BotContext) {
     if (!ctx.from) return;
     await ctx.answerCbQuery();
 
     const match = (ctx as any).match;
     const donationId = parseInt(match[1], 10);
-    const method = match[2] || 'telebirr';
+    const method = 'transfer';
 
     const donation = await this.donationsService.markAsDonated(donationId, method);
 
     await ctx.replyWithHTML(
-      '🙏 <b>Thank You for Your Generous Heart!</b>\n\n' +
-        `Your gift of <b>${donation.amount} ${donation.currency}</b> has been received and submitted for verification.\n\n` +
-        `• <b>Donation Reference:</b> <code>${donation.referenceNumber}</code>\n` +
-        `• <b>Payment Method:</b> <b>${donation.paymentMethod.toUpperCase()}</b>\n` +
-        `• <b>Status:</b> ⏳ <b>Pending Verification</b>\n\n` +
-        `Our administration team will verify your transfer on our console shortly.\n\n` +
-        `<i>"Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver." — 2 Cor 9:7</i>`,
+      '🙏 <b>Thank You for Your Support!</b>\n\n' +
+        `Your gift of <b>${donation.amount} ${donation.currency}</b> has been received.\n\n` +
+        `• <b>Donation Reference:</b> <code>${donation.referenceNumber}</code>\n\n` +
+        'Thank you for partnering with Purity Matters Ministry. Your support is deeply appreciated and makes a real difference in transforming lives!',
       Markup.inlineKeyboard([
         [Markup.button.callback('🔙 Return to Services', 'cmd_services')],
         [Markup.button.callback('🏠 Main Menu', 'cmd_main_menu')],
