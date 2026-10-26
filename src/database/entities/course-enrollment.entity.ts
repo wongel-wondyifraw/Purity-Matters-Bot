@@ -76,7 +76,7 @@ export class CourseEnrollment {
 
   @ManyToOne(() => Course, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'courseId' })
-  course: Course;
+  course: Course | null;
 
   @CreateDateColumn()
   createdAt: Date;

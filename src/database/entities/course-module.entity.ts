@@ -38,7 +38,7 @@ export class CourseModule {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'courseId' })
-  course: Course;
+  course: Course | null;
 
   @OneToMany(() => CourseSection, (section) => section.module, {
     cascade: true,

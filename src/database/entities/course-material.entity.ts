@@ -39,7 +39,7 @@ export class CourseMaterial {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'sectionId' })
-  section: CourseSection;
+  section: CourseSection | null;
 
   @CreateDateColumn()
   createdAt: Date;

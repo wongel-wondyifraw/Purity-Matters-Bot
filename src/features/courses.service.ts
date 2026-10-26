@@ -519,7 +519,7 @@ export class CoursesService {
     }
 
     const courseSlug = section.module?.course?.slug || (await this.findCourseById(courseId)).slug;
-    const moduleSlug = section.module?.slug;
+    const moduleSlug = section.module?.slug || `module-${moduleId}`;
 
     // Target directory: uploads/courses/{course-name}/{module-name}/
     const targetDir = path.resolve(process.cwd(), 'uploads/courses', courseSlug, moduleSlug);
