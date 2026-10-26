@@ -13,34 +13,34 @@ export class Donation {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ type: 'varchar', length: 64, unique: true })
   referenceNumber: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', length: 64 })
   telegramId: string;
 
-  @Column()
+  @Column({ type: 'varchar', length: 255 })
   clientName: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   clientUsername?: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 64, nullable: true })
   clientPhone?: string | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
 
-  @Column({ default: 'ETB' })
+  @Column({ type: 'varchar', length: 16, default: 'ETB' })
   currency: string;
 
-  @Column({ default: 'telebirr' })
+  @Column({ type: 'varchar', length: 64, default: 'telebirr' })
   paymentMethod: string; // 'telebirr' | 'cbe' | 'other'
 
-  @Column({ default: 'pending' })
+  @Column({ type: 'varchar', length: 32, default: 'pending' })
   status: DonationStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   transactionReference?: string | null;
 
   @Column({ type: 'text', nullable: true })
