@@ -53,12 +53,12 @@ let AuthService = AuthService_1 = class AuthService {
             const role = this.configService.get('defaultAdmin.role') ||
                 process.env.DEFAULT_ADMIN_ROLE ||
                 UserRole.SUPERADMIN;
-            const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-            let user = await this.userRepository.findOne({
+            const existingUser = await this.userRepository.findOne({
                 where: { email: defaultEmail },
             });
-            if (!user) {
-                user = this.userRepository.create({
+            if (!existingUser) {
+                const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+                const newUser = this.userRepository.create({
                     firstName,
                     middleName,
                     lastName,
@@ -67,20 +67,20 @@ let AuthService = AuthService_1 = class AuthService {
                     role,
                     isActive: true,
                 });
-                await this.userRepository.save(user);
-                this.logger.log(`Administrator successfully seeded from .env: ${defaultEmail} (Password from .env: ${defaultPassword})`);
+                await this.userRepository.save(newUser);
+                this.logger.log(`Administrator successfully seeded from .env: ${defaultEmail}`);
                 return { message: `Administrator seeded from .env: ${defaultEmail}` };
             }
             else {
-                user.firstName = firstName;
-                user.middleName = middleName;
-                user.lastName = lastName;
-                user.role = role;
-                user.isActive = true;
-                user.password = hashedPassword;
-                await this.userRepository.save(user);
-                this.logger.log(`Administrator synchronized with .env settings: ${defaultEmail}`);
-                return { message: `Administrator synchronized with .env: ${defaultEmail}` };
+                if (!existingUser.isActive) {
+                    existingUser.isActive = true;
+                    await this.userRepository.save(existingUser);
+                    this.logger.log(`Re-activated existing administrator: ${defaultEmail}`);
+                }
+                else {
+                    this.logger.log(`Administrator already exists, skipping seed: ${defaultEmail}`);
+                }
+                return { message: `Administrator already exists: ${defaultEmail}` };
             }
         }
         catch (error) {

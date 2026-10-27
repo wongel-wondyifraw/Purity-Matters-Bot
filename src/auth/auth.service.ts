@@ -71,14 +71,14 @@ export class AuthService implements OnModuleInit {
         process.env.DEFAULT_ADMIN_ROLE ||
         UserRole.SUPERADMIN;
 
-      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
-      let user = await this.userRepository.findOne({
+      const existingUser = await this.userRepository.findOne({
         where: { email: defaultEmail },
       });
 
-      if (!user) {
-        user = this.userRepository.create({
+      if (!existingUser) {
+        // Only create the admin user if it doesn't exist yet — never overwrite
+        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const newUser = this.userRepository.create({
           firstName,
           middleName,
           lastName,
@@ -87,23 +87,26 @@ export class AuthService implements OnModuleInit {
           role,
           isActive: true,
         });
-        await this.userRepository.save(user);
+        await this.userRepository.save(newUser);
         this.logger.log(
-          `Administrator successfully seeded from .env: ${defaultEmail} (Password from .env: ${defaultPassword})`,
+          `Administrator successfully seeded from .env: ${defaultEmail}`,
         );
         return { message: `Administrator seeded from .env: ${defaultEmail}` };
       } else {
-        user.firstName = firstName;
-        user.middleName = middleName;
-        user.lastName = lastName;
-        user.role = role;
-        user.isActive = true;
-        user.password = hashedPassword;
-        await this.userRepository.save(user);
-        this.logger.log(
-          `Administrator synchronized with .env settings: ${defaultEmail}`,
-        );
-        return { message: `Administrator synchronized with .env: ${defaultEmail}` };
+        // User already exists — do NOT overwrite their profile data.
+        // Only ensure the account is active so the admin is never locked out.
+        if (!existingUser.isActive) {
+          existingUser.isActive = true;
+          await this.userRepository.save(existingUser);
+          this.logger.log(
+            `Re-activated existing administrator: ${defaultEmail}`,
+          );
+        } else {
+          this.logger.log(
+            `Administrator already exists, skipping seed: ${defaultEmail}`,
+          );
+        }
+        return { message: `Administrator already exists: ${defaultEmail}` };
       }
     } catch (error) {
       this.logger.error('Failed to seed administrator from .env:', error);
