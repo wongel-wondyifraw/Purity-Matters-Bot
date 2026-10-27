@@ -389,7 +389,7 @@ let BotUpdate = BotUpdate_1 = class BotUpdate {
             return;
         }
         await ctx.replyWithHTML('📚 <b>Training & Courses</b>\n\n' +
-            'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+            'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
             '<i>Select a course to view details and begin:</i>', this.botService.getCoursesListKeyboard(courses, 1, 5));
     }
     async onCrsPage(ctx) {
@@ -400,7 +400,7 @@ let BotUpdate = BotUpdate_1 = class BotUpdate {
         const courses = await this.coursesService.findAllCourses({ type: 'all' });
         try {
             await ctx.editMessageText('📚 <b>Training & Courses</b>\n\n' +
-                'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+                'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
                 '<i>Select a course to view details and begin:</i>', {
                 parse_mode: 'HTML',
                 ...this.botService.getCoursesListKeyboard(courses, page, 5),
@@ -408,7 +408,7 @@ let BotUpdate = BotUpdate_1 = class BotUpdate {
         }
         catch {
             await ctx.replyWithHTML('📚 <b>Training & Courses</b>\n\n' +
-                'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+                'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
                 '<i>Select a course to view details and begin:</i>', this.botService.getCoursesListKeyboard(courses, page, 5));
         }
     }

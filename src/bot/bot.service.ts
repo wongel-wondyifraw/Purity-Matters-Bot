@@ -342,7 +342,7 @@ export class BotService {
       `Please select a service using the persistent menu buttons below:\n\n` +
       `🛋️ <b>Counselling Request</b> — Confidential 1-on-1 support for personal, family, relationship, or purity concerns.\n\n` +
       `🕊️ <b>Inner Healing</b> — Healing prayer and restoration for rejection, abandonment, and emotional wounds.\n\n` +
-      `📚 <b>Training & Courses</b> — 7-day and 21-day structured transformation journeys.\n\n` +
+      `📚 <b>Training & Courses</b> — Structured curriculum and interactive modules for purity and freedom.\n\n` +
       `📖 <b>Resource Request</b> — Essential guides, workbooks, and paid e-books for your walk.\n\n` +
       `👤 <b>My Requests & Profile</b> — View your active requests, orders, and profile status.`
     );

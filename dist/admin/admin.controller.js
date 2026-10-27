@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Controller, Get, Patch, Post, Delete, Param, Body, Query, ParseIntPipe, UseInterceptors, UploadedFile, NotFoundException, BadRequestException, } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Param, Body, Query, ParseIntPipe, UseInterceptors, UploadedFile, NotFoundException, BadRequestException, UseGuards, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
@@ -25,6 +25,10 @@ import { AnonymousQuestionsService } from '../features/anonymous-questions.servi
 import { PaymentSettingsService } from '../features/payment-settings.service.js';
 import { DonationsService } from '../features/donations.service.js';
 import { BotService, generateValidPdfBuffer, resolveUploadDiskPath } from '../bot/bot.service.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/roles.guard.js';
+import { Roles } from '../auth/roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 let AdminController = class AdminController {
     clientsService;
     counselingService;
@@ -660,6 +664,7 @@ __decorate([
 ], AdminController.prototype, "updateClient", null);
 __decorate([
     Delete('clients/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -688,6 +693,7 @@ __decorate([
 ], AdminController.prototype, "updateCounseling", null);
 __decorate([
     Delete('counseling/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -774,6 +780,7 @@ __decorate([
 ], AdminController.prototype, "updateCourse", null);
 __decorate([
     Delete('courses/catalog/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -983,6 +990,7 @@ __decorate([
 ], AdminController.prototype, "updateResource", null);
 __decorate([
     Delete('resources/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -1032,6 +1040,7 @@ __decorate([
 ], AdminController.prototype, "answerQuestion", null);
 __decorate([
     Delete('questions/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -1045,6 +1054,7 @@ __decorate([
 ], AdminController.prototype, "getPaymentSettings", null);
 __decorate([
     Patch('payment-settings'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Body()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -1076,6 +1086,7 @@ __decorate([
 ], AdminController.prototype, "rejectResourceOrderPayment", null);
 __decorate([
     Delete('resources/orders/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -1083,6 +1094,7 @@ __decorate([
 ], AdminController.prototype, "deletePhysicalOrder", null);
 __decorate([
     Delete('resource-orders/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -1114,6 +1126,7 @@ __decorate([
 ], AdminController.prototype, "rejectDonation", null);
 __decorate([
     Delete('donations/:id'),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Param('id', ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
@@ -1128,6 +1141,7 @@ __decorate([
 ], AdminController.prototype, "broadcastBotUpdate", null);
 AdminController = __decorate([
     Controller('api/admin'),
+    UseGuards(JwtAuthGuard, RolesGuard),
     __metadata("design:paramtypes", [ClientsService,
         CounselingService,
         InnerHealingService,

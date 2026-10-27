@@ -10,6 +10,8 @@ import { UsersController } from './users.controller.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
+import { RolesGuard } from './roles.guard.js';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
@@ -29,7 +31,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
     }),
   ],
   controllers: [AuthController, UsersController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtAuthGuard, JwtModule],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

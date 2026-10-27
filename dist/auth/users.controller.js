@@ -15,6 +15,9 @@ import { AuthService } from './auth.service.js';
 import { RegisterUserDto } from './dto/register.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
+import { Roles } from './roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 let UsersController = class UsersController {
     authService;
     constructor(authService) {
@@ -63,7 +66,8 @@ __decorate([
 ], UsersController.prototype, "remove", null);
 UsersController = __decorate([
     Controller('api/users'),
-    UseGuards(JwtAuthGuard),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __metadata("design:paramtypes", [AuthService])
 ], UsersController);
 export { UsersController };

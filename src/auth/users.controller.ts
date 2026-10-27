@@ -13,9 +13,13 @@ import { AuthService } from './auth.service.js';
 import { RegisterUserDto } from './dto/register.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
+import { Roles } from './roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 
 @Controller('api/users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
 export class UsersController {
   constructor(private readonly authService: AuthService) {}
 

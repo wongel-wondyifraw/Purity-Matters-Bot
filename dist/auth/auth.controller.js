@@ -15,6 +15,9 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterUserDto } from './dto/register.dto.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
+import { Roles } from './roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -52,6 +55,8 @@ __decorate([
 ], AuthController.prototype, "getProfile", null);
 __decorate([
     Post('register'),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles(UserRole.SUPERADMIN, UserRole.ADMIN),
     __param(0, Body()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [RegisterUserDto]),
@@ -59,6 +64,8 @@ __decorate([
 ], AuthController.prototype, "register", null);
 __decorate([
     Post('seed'),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles(UserRole.SUPERADMIN),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)

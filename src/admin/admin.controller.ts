@@ -12,6 +12,7 @@ import {
   UploadedFile,
   NotFoundException,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -29,8 +30,13 @@ import { DonationsService } from '../features/donations.service.js';
 import { BotService, generateValidPdfBuffer, resolveUploadDiskPath } from '../bot/bot.service.js';
 import { PhysicalOrderStatus } from '../database/entities/physical-book-order.entity.js';
 import { Resource } from '../database/entities/resource.entity.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/roles.guard.js';
+import { Roles } from '../auth/roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 
 @Controller('api/admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminController {
   constructor(
     private readonly clientsService: ClientsService,
@@ -175,6 +181,7 @@ export class AdminController {
   }
 
   @Delete('clients/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteClient(@Param('id', ParseIntPipe) id: number) {
     const success = await this.clientsService.deleteClient(id);
     return { success };
@@ -231,6 +238,7 @@ export class AdminController {
   }
 
   @Delete('counseling/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteCounseling(@Param('id', ParseIntPipe) id: number) {
     const success = await this.counselingService.deleteRequest(id);
     if (!success) {
@@ -386,6 +394,7 @@ export class AdminController {
   }
 
   @Delete('courses/catalog/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteCourse(@Param('id', ParseIntPipe) id: number) {
     const success = await this.coursesService.deleteCourse(id);
     if (!success) {
@@ -738,6 +747,7 @@ export class AdminController {
   }
 
   @Delete('resources/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteResource(@Param('id', ParseIntPipe) id: number) {
     const success = await this.resourcesService.deleteResource(id);
     if (!success) {
@@ -857,6 +867,7 @@ export class AdminController {
   }
 
   @Delete('questions/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteQuestion(@Param('id', ParseIntPipe) id: number) {
     const success = await this.questionsService.deleteQuestion(id);
     if (!success) {
@@ -875,6 +886,7 @@ export class AdminController {
   }
 
   @Patch('payment-settings')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async updatePaymentSettings(
     @Body()
     body: {
@@ -1012,6 +1024,7 @@ export class AdminController {
   }
 
   @Delete('resources/orders/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deletePhysicalOrder(@Param('id', ParseIntPipe) id: number) {
     const success = await this.resourcesService.deletePhysicalOrder(id);
     if (!success) {
@@ -1021,6 +1034,7 @@ export class AdminController {
   }
 
   @Delete('resource-orders/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteResourceOrder(@Param('id', ParseIntPipe) id: number) {
     const success = await this.resourcesService.deleteResourceOrder(id);
     if (!success) {
@@ -1060,6 +1074,7 @@ export class AdminController {
   }
 
   @Delete('donations/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async deleteDonation(@Param('id', ParseIntPipe) id: number) {
     const success = await this.donationsService.delete(id);
     if (!success) {

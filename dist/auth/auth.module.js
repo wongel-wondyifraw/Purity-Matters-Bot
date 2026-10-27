@@ -15,6 +15,7 @@ import { AuthController } from './auth.controller.js';
 import { UsersController } from './users.controller.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
 let AuthModule = class AuthModule {
 };
 AuthModule = __decorate([
@@ -34,8 +35,8 @@ AuthModule = __decorate([
             }),
         ],
         controllers: [AuthController, UsersController],
-        providers: [AuthService, JwtStrategy, JwtAuthGuard],
-        exports: [AuthService, JwtAuthGuard, JwtModule],
+        providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+        exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
     })
 ], AuthModule);
 export { AuthModule };

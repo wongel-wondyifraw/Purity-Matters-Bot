@@ -12,6 +12,9 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterUserDto } from './dto/register.dto.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
+import { Roles } from './roles.decorator.js';
+import { UserRole } from '../database/entities/user.entity.js';
 
 @Controller('api/auth')
 export class AuthController {
@@ -31,11 +34,15 @@ export class AuthController {
   }
 
   @Post('register')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async register(@Body() registerDto: RegisterUserDto) {
     return this.authService.register(registerDto);
   }
 
   @Post('seed')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN)
   async seedAdmin() {
     return this.authService.seedFromEnv();
   }

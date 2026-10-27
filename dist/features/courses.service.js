@@ -437,48 +437,7 @@ let CoursesService = CoursesService_1 = class CoursesService {
         return true;
     }
     getCourses() {
-        return [
-            {
-                id: 'journey_7d',
-                title: '🌅 7-Day Journey: Overcoming Triggers & Building Purity',
-                durationDays: 7,
-                description: 'A focused 7-day journey to understand personal triggers, guard your heart, and build sustainable purity habits.',
-                lessons: {
-                    1: {
-                        day: 1,
-                        title: 'Identifying Your Core Triggers',
-                        scripture: 'Proverbs 4:23 — "Above all else, guard your heart, for everything you do flows from it."',
-                        teaching: 'Freedom begins with self-awareness. Most slips happen when we are tired, lonely, stressed, or bored (HALT: Hungry, Angry, Lonely, Tired). By identifying what sparks unwanted thoughts, we can replace the vulnerability with truth and healthier coping mechanisms.',
-                        reflectionQuestion: 'What specific time of day or emotional state makes you feel most vulnerable? Write down your top 2 triggers.',
-                        practicalAction: 'Remove or set screen-time locks on 1 digital app or environment that frequently triggers you.',
-                    },
-                    2: {
-                        day: 2,
-                        title: 'The Power of Renewing the Mind',
-                        scripture: 'Romans 12:2 — "Do not conform to the pattern of this world, but be transformed by the renewing of your mind."',
-                        teaching: 'Thoughts become beliefs, beliefs become actions, and actions form habits. When an impure or destructive thought enters, do not entertain it. Immediately redirect your attention to higher purpose.',
-                        reflectionQuestion: 'What lie have you believed about your ability to walk in total purity and wholeness?',
-                        practicalAction: 'Memorize or write down Romans 12:2 on a card or phone wallpaper for today.',
-                    },
-                },
-            },
-            {
-                id: 'journey_21d',
-                title: '🌱 21-Day Journey: Walking in Freedom & Wholeness',
-                durationDays: 21,
-                description: 'A deep transformational 21-day program to rewire your neuro-pathways, heal heart wounds, and cultivate lasting victory.',
-                lessons: {
-                    1: {
-                        day: 1,
-                        title: 'Laying the Foundation of Freedom',
-                        scripture: 'John 8:36 — "So if the Son sets you free, you will be free indeed."',
-                        teaching: 'Purity is not merely the absence of a negative behavior; it is the presence of divine life, purpose, and integrity within your heart.',
-                        reflectionQuestion: 'What does true freedom look like for you one year from now?',
-                        practicalAction: 'Take 10 minutes of quiet reflection and prayer to commit this 21-day journey.',
-                    },
-                },
-            },
-        ];
+        return [];
     }
     getCourse(courseId) {
         return this.getCourses().find((c) => c.id === courseId);

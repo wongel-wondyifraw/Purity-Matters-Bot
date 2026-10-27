@@ -540,7 +540,7 @@ export class BotUpdate {
 
     await ctx.replyWithHTML(
       '📚 <b>Training & Courses</b>\n\n' +
-      'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+      'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
       '<i>Select a course to view details and begin:</i>',
       this.botService.getCoursesListKeyboard(courses, 1, 5),
     );
@@ -557,7 +557,7 @@ export class BotUpdate {
     try {
       await ctx.editMessageText(
         '📚 <b>Training & Courses</b>\n\n' +
-        'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+        'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
         '<i>Select a course to view details and begin:</i>',
         {
           parse_mode: 'HTML',
@@ -567,7 +567,7 @@ export class BotUpdate {
     } catch {
       await ctx.replyWithHTML(
         '📚 <b>Training & Courses</b>\n\n' +
-        'Explore our dynamic learning journeys below. Complete lessons sequentially, deepen your spiritual walk, and track your progress.\n\n' +
+        'Explore our training courses below. Complete modules sequentially, deepen your spiritual walk, and track your progress.\n\n' +
         '<i>Select a course to view details and begin:</i>',
         this.botService.getCoursesListKeyboard(courses, page, 5),
       );
