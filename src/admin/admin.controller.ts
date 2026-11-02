@@ -34,6 +34,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { UserRole } from '../database/entities/user.entity.js';
+import { normalizePage, toPageResult } from '../common/pagination.js';
 
 @Controller('api/admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -187,9 +188,25 @@ export class AdminController {
     return { success };
   }
 
+  @Get('counseling/count')
+  getCounselingCount() {
+    return this.counselingService.count();
+  }
+
   @Get('counseling')
-  async getCounseling() {
-    return this.counselingService.findAll();
+  async getCounseling(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    if (page === undefined && limit === undefined) {
+      return this.counselingService.findAll();
+    }
+
+    const pageRequest = normalizePage(page, limit);
+    const result = await this.counselingService.findAdminPage(pageRequest, { status, search });
+    return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
   }
 
   @Post('counseling')
@@ -249,10 +266,11 @@ export class AdminController {
 
   @Get('inner-healing')
   async getInnerHealing() {
-    const [requests, clients] = await Promise.all([
-      this.innerHealingService.findAll(),
-      this.clientsService.findAll(),
-    ]);
+    const requests = await this.innerHealingService.findAll();
+    const missingClientIds = requests
+      .filter((item) => !item.clientName || !item.phone)
+      .map((item) => item.telegramId);
+    const clients = await this.clientsService.findByTelegramIds(missingClientIds);
     const clientMap = new Map(clients.map((c) => [String(c.telegramId), c]));
     return requests.map((item) => {
       const client = clientMap.get(String(item.telegramId));
@@ -821,8 +839,19 @@ export class AdminController {
   }
 
   @Get('questions')
-  async getQuestions() {
-    return this.questionsService.getAll();
+  async getQuestions(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    if (page === undefined && limit === undefined && status === undefined && search === undefined) {
+      return this.questionsService.getAll();
+    }
+
+    const pageRequest = normalizePage(page, limit);
+    const result = await this.questionsService.getAdminPage(pageRequest, { status, search });
+    return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
   }
 
   @Patch('questions/:id/answer')
@@ -1051,8 +1080,25 @@ export class AdminController {
   async getDonations(
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
+    if (page !== undefined || limit !== undefined || paymentMethod !== undefined) {
+      const pageRequest = normalizePage(page, limit);
+      const result = await this.donationsService.findAdminPage(pageRequest, {
+        status,
+        search,
+        paymentMethod,
+      });
+      return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
+    }
     return this.donationsService.findAll({ status, search });
+  }
+
+  @Get('donations/summary')
+  getDonationSummary() {
+    return this.donationsService.getAdminSummary();
   }
 
   @Post('donations/:id/verify')

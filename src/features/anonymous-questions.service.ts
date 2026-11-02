@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike } from 'typeorm';
 import { AnonymousQuestion } from '../database/entities/anonymous-question.entity.js';
+import type { PageRequest } from '../common/pagination.js';
 
 @Injectable()
 export class AnonymousQuestionsService {
@@ -77,6 +78,40 @@ export class AnonymousQuestionsService {
     return this.questionRepo.find({
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async getAdminPage(
+    pageRequest: PageRequest,
+    filters: { status?: string; search?: string },
+  ): Promise<{ items: AnonymousQuestion[]; total: number; page: number }> {
+    // Apply search and the page window in SQL before rows cross the API boundary.
+    const query = this.questionRepo.createQueryBuilder('question');
+
+    if (filters.status && filters.status !== 'all') {
+      query.andWhere('question.status = :status', { status: filters.status });
+    }
+
+    if (filters.search?.trim()) {
+      query.andWhere(
+        '(question.question ILIKE :search OR question.category ILIKE :search OR question.referenceNumber ILIKE :search)',
+        { search: `%${filters.search.trim()}%` },
+      );
+    }
+
+    query
+      .orderBy('question.createdAt', 'DESC')
+      .addOrderBy('question.id', 'DESC')
+      .skip((pageRequest.page - 1) * pageRequest.limit)
+      .take(pageRequest.limit);
+
+    let [items, total] = await query.getManyAndCount();
+    const totalPages = Math.max(1, Math.ceil(total / pageRequest.limit));
+    const page = Math.min(pageRequest.page, totalPages);
+    if (page !== pageRequest.page) {
+      query.skip((page - 1) * pageRequest.limit).take(pageRequest.limit);
+      items = await query.getMany();
+    }
+    return { items, total, page };
   }
 
   async findById(id: number): Promise<AnonymousQuestion | null> {

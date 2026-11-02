@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CounselingRequest } from '../database/entities/counseling-request.entity.js';
 import { ClientsService } from '../clients/clients.service.js';
+import type { PageRequest } from '../common/pagination.js';
 
 export interface CounselingDraft {
   concern?: string;
@@ -82,6 +83,37 @@ export class CounselingService {
 
   async findAll(): Promise<CounselingRequest[]> {
     return this.requestRepo.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async findAdminPage(
+    pageRequest: PageRequest,
+    filters: { status?: string; search?: string },
+  ) {
+    const query = this.requestRepo.createQueryBuilder('request');
+    if (filters.status && filters.status !== 'all') {
+      query.andWhere('request.status = :status', { status: filters.status });
+    }
+    if (filters.search?.trim()) {
+      const search = `%${filters.search.trim()}%`;
+      query.andWhere(
+        '(request.clientName ILIKE :search OR request.referenceNumber ILIKE :search OR request.concern ILIKE :search OR request.assignedTo ILIKE :search OR request.phone ILIKE :search)',
+        { search },
+      );
+    }
+
+    query
+      .orderBy('request.createdAt', 'DESC')
+      .addOrderBy('request.id', 'DESC')
+      .skip((pageRequest.page - 1) * pageRequest.limit)
+      .take(pageRequest.limit);
+    let [items, total] = await query.getManyAndCount();
+    const totalPages = Math.max(1, Math.ceil(total / pageRequest.limit));
+    const page = Math.min(pageRequest.page, totalPages);
+    if (page !== pageRequest.page) {
+      query.skip((page - 1) * pageRequest.limit).take(pageRequest.limit);
+      items = await query.getMany();
+    }
+    return { items, total, page };
   }
 
   async count(): Promise<number> {

@@ -575,30 +575,22 @@ export class ResourcesService implements OnModuleInit {
     paymentStatus?: string;
     search?: string;
   }): Promise<ResourceOrder[]> {
-    const where: any = {};
+    const query = this.orderRepo.createQueryBuilder('resourceOrder');
     if (filter?.paymentStatus && filter.paymentStatus !== 'all') {
-      where.paymentStatus = filter.paymentStatus;
+      query.andWhere('resourceOrder.paymentStatus = :paymentStatus', {
+        paymentStatus: filter.paymentStatus,
+      });
     }
 
-    const orders = await this.orderRepo.find({
-      where,
-      order: { createdAt: 'DESC' },
-    });
-
-    if (filter?.search) {
-      const q = filter.search.toLowerCase().trim();
-      return orders.filter(
-        (o) =>
-          o.orderNumber.toLowerCase().includes(q) ||
-          o.resourceTitle.toLowerCase().includes(q) ||
-          (o.clientName && o.clientName.toLowerCase().includes(q)) ||
-          (o.phone && o.phone.toLowerCase().includes(q)) ||
-          (o.paymentReference && o.paymentReference.toLowerCase().includes(q)) ||
-          o.telegramId.includes(q),
+    if (filter?.search?.trim()) {
+      const search = `%${filter.search.trim()}%`;
+      query.andWhere(
+        '(resourceOrder.orderNumber ILIKE :search OR resourceOrder.resourceTitle ILIKE :search OR resourceOrder.clientName ILIKE :search OR resourceOrder.phone ILIKE :search OR resourceOrder.paymentReference ILIKE :search OR CAST(resourceOrder.telegramId AS TEXT) ILIKE :search)',
+        { search },
       );
     }
 
-    return orders;
+    return query.orderBy('resourceOrder.createdAt', 'DESC').getMany();
   }
 
   async findResourceOrderById(id: number): Promise<ResourceOrder | null> {

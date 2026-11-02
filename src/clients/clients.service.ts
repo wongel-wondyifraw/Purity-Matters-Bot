@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Client } from '../database/entities/client.entity.js';
 
 export interface TelegramUserData {
@@ -123,6 +123,12 @@ export class ClientsService {
     return this.clientRepository.find({ order: { createdAt: 'DESC' } });
   }
 
+  async findByTelegramIds(telegramIds: Array<string | number>): Promise<Client[]> {
+    const uniqueIds = [...new Set(telegramIds.map(String).filter(Boolean))];
+    if (uniqueIds.length === 0) return [];
+    return this.clientRepository.find({ where: { telegramId: In(uniqueIds) } });
+  }
+
   async findById(id: number): Promise<Client | null> {
     return this.clientRepository.findOne({ where: { id } });
   }
@@ -142,15 +148,12 @@ export class ClientsService {
 
     const digitsOnly = clean.replace(/\D/g, '');
     if (digitsOnly.length >= 7) {
-      const allWithPhone = await this.clientRepository.find({
-        select: { id: true, phone: true, fullName: true, telegramId: true },
-      });
-      const match = allWithPhone.find(
-        (c) => c.phone && c.phone.replace(/\D/g, '') === digitsOnly,
-      );
-      if (match) {
-        return this.findById(match.id);
-      }
+      return this.clientRepository
+        .createQueryBuilder('client')
+        .where("regexp_replace(client.phone, '[^0-9]', '', 'g') = :digits", {
+          digits: digitsOnly,
+        })
+        .getOne();
     }
     return null;
   }

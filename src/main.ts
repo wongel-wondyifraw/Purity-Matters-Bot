@@ -26,6 +26,19 @@ async function bootstrap() {
   // Strict anti-caching middleware for dynamic API endpoints.
   // Overrides upstream proxy defaults (e.g. cPanel LiteSpeed/Apache public, max-age=2592000).
   app.use((req: Request, res: Response, next: NextFunction) => {
+    const startedAt = Date.now();
+    if (req.path.startsWith('/api/')) {
+      res.once('finish', () => {
+        const durationMs = Date.now() - startedAt;
+        if (res.statusCode >= 400 || durationMs >= 1500) {
+          // Record route health without logging query values, request bodies, or credentials.
+          logger.warn(
+            `API ${req.method} ${req.path} status=${res.statusCode} durationMs=${durationMs}`,
+          );
+        }
+      });
+    }
+
     if (req.path.startsWith('/uploads/')) {
       res.setHeader('Cache-Control', 'public, max-age=86400');
     } else {
