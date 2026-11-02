@@ -52,6 +52,50 @@ let DonationsService = DonationsService_1 = class DonationsService {
         qb.orderBy('donation.createdAt', 'DESC');
         return qb.getMany();
     }
+    async findAdminPage(pageRequest, filter) {
+        const query = this.donationRepo.createQueryBuilder('donation');
+        if (filter.status && filter.status !== 'all') {
+            query.andWhere('donation.status = :status', { status: filter.status });
+        }
+        if (filter.paymentMethod && filter.paymentMethod !== 'all') {
+            query.andWhere('donation.paymentMethod = :paymentMethod', {
+                paymentMethod: filter.paymentMethod,
+            });
+        }
+        if (filter.search?.trim()) {
+            const search = `%${filter.search.trim()}%`;
+            query.andWhere('(donation.referenceNumber ILIKE :search OR donation.clientName ILIKE :search OR donation.clientUsername ILIKE :search OR donation.clientPhone ILIKE :search OR donation.telegramId ILIKE :search)', { search });
+        }
+        query
+            .orderBy('donation.createdAt', 'DESC')
+            .addOrderBy('donation.id', 'DESC')
+            .skip((pageRequest.page - 1) * pageRequest.limit)
+            .take(pageRequest.limit);
+        let [items, total] = await query.getManyAndCount();
+        const totalPages = Math.max(1, Math.ceil(total / pageRequest.limit));
+        const page = Math.min(pageRequest.page, totalPages);
+        if (page !== pageRequest.page) {
+            query.skip((page - 1) * pageRequest.limit).take(pageRequest.limit);
+            items = await query.getMany();
+        }
+        return { items, total, page };
+    }
+    async getAdminSummary() {
+        const result = await this.donationRepo
+            .createQueryBuilder('donation')
+            .select('COUNT(donation.id)', 'total')
+            .addSelect('COALESCE(SUM(CASE WHEN donation.status = :verified THEN donation.amount ELSE 0 END), 0)', 'verifiedAmount')
+            .addSelect('SUM(CASE WHEN donation.status = :verified THEN 1 ELSE 0 END)', 'verifiedCount')
+            .addSelect('SUM(CASE WHEN donation.status IN (:...pendingStatuses) THEN 1 ELSE 0 END)', 'pendingCount')
+            .setParameters({ verified: 'verified', pendingStatuses: ['pending', 'payment_submitted'] })
+            .getRawOne();
+        return {
+            total: Number(result?.total) || 0,
+            verifiedAmount: Number(result?.verifiedAmount) || 0,
+            verifiedCount: Number(result?.verifiedCount) || 0,
+            pendingCount: Number(result?.pendingCount) || 0,
+        };
+    }
     async findById(id) {
         const donation = await this.donationRepo.findOneBy({ id });
         if (!donation) {

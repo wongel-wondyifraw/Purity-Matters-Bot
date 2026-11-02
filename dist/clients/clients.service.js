@@ -13,7 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var ClientsService_1;
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Client } from '../database/entities/client.entity.js';
 let ClientsService = ClientsService_1 = class ClientsService {
     clientRepository;
@@ -107,6 +107,12 @@ let ClientsService = ClientsService_1 = class ClientsService {
     async findAll() {
         return this.clientRepository.find({ order: { createdAt: 'DESC' } });
     }
+    async findByTelegramIds(telegramIds) {
+        const uniqueIds = [...new Set(telegramIds.map(String).filter(Boolean))];
+        if (uniqueIds.length === 0)
+            return [];
+        return this.clientRepository.find({ where: { telegramId: In(uniqueIds) } });
+    }
     async findById(id) {
         return this.clientRepository.findOne({ where: { id } });
     }
@@ -126,13 +132,12 @@ let ClientsService = ClientsService_1 = class ClientsService {
             return direct;
         const digitsOnly = clean.replace(/\D/g, '');
         if (digitsOnly.length >= 7) {
-            const allWithPhone = await this.clientRepository.find({
-                select: { id: true, phone: true, fullName: true, telegramId: true },
-            });
-            const match = allWithPhone.find((c) => c.phone && c.phone.replace(/\D/g, '') === digitsOnly);
-            if (match) {
-                return this.findById(match.id);
-            }
+            return this.clientRepository
+                .createQueryBuilder('client')
+                .where("regexp_replace(client.phone, '[^0-9]', '', 'g') = :digits", {
+                digits: digitsOnly,
+            })
+                .getOne();
         }
         return null;
     }

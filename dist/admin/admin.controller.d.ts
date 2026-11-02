@@ -76,7 +76,8 @@ export declare class AdminController {
     deleteClient(id: number): Promise<{
         success: boolean;
     }>;
-    getCounseling(): Promise<import("../database/entities/counseling-request.entity.js").CounselingRequest[]>;
+    getCounselingCount(): Promise<number>;
+    getCounseling(page?: string, limit?: string, status?: string, search?: string): Promise<import("../database/entities/counseling-request.entity.js").CounselingRequest[] | import("../common/pagination.js").PageResult<import("../database/entities/counseling-request.entity.js").CounselingRequest>>;
     createCounseling(body: {
         clientName: string;
         phone?: string | null;
@@ -210,7 +211,7 @@ export declare class AdminController {
         downloadUrl?: string | null;
         createdAt: Date;
     }[]>;
-    getQuestions(): Promise<import("../database/entities/anonymous-question.entity.js").AnonymousQuestion[]>;
+    getQuestions(page?: string, limit?: string, status?: string, search?: string): Promise<import("../database/entities/anonymous-question.entity.js").AnonymousQuestion[] | import("../common/pagination.js").PageResult<import("../database/entities/anonymous-question.entity.js").AnonymousQuestion>>;
     answerQuestion(id: number, body: {
         answer: string;
         assignedCounselor?: string | null;
@@ -276,7 +277,13 @@ export declare class AdminController {
         success: boolean;
         message: string;
     }>;
-    getDonations(status?: string, search?: string): Promise<import("../database/entities/donation.entity.js").Donation[]>;
+    getDonations(status?: string, search?: string, paymentMethod?: string, page?: string, limit?: string): Promise<import("../database/entities/donation.entity.js").Donation[] | import("../common/pagination.js").PageResult<import("../database/entities/donation.entity.js").Donation>>;
+    getDonationSummary(): Promise<{
+        total: number;
+        verifiedAmount: number;
+        verifiedCount: number;
+        pendingCount: number;
+    }>;
     verifyDonation(id: number, body?: {
         adminNotes?: string;
     }): Promise<{

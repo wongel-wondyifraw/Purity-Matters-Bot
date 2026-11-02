@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { CounselingRequest } from '../database/entities/counseling-request.entity.js';
 import { ClientsService } from '../clients/clients.service.js';
+import type { PageRequest } from '../common/pagination.js';
 export interface CounselingDraft {
     concern?: string;
     description?: string | null;
@@ -24,6 +25,14 @@ export declare class CounselingService {
     createRequest(telegramId: string | number): Promise<CounselingRequest | null>;
     getRequestsByClient(telegramId: string | number): Promise<CounselingRequest[]>;
     findAll(): Promise<CounselingRequest[]>;
+    findAdminPage(pageRequest: PageRequest, filters: {
+        status?: string;
+        search?: string;
+    }): Promise<{
+        items: CounselingRequest[];
+        total: number;
+        page: number;
+    }>;
     count(): Promise<number>;
     updateStatus(id: number, status: string, assignedTo?: string): Promise<CounselingRequest | null>;
     updateRequest(id: number, data: {

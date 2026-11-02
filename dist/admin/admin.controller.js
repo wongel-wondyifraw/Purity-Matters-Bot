@@ -29,6 +29,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { UserRole } from '../database/entities/user.entity.js';
+import { normalizePage, toPageResult } from '../common/pagination.js';
 let AdminController = class AdminController {
     clientsService;
     counselingService;
@@ -147,8 +148,16 @@ let AdminController = class AdminController {
         const success = await this.clientsService.deleteClient(id);
         return { success };
     }
-    async getCounseling() {
-        return this.counselingService.findAll();
+    getCounselingCount() {
+        return this.counselingService.count();
+    }
+    async getCounseling(page, limit, status, search) {
+        if (page === undefined && limit === undefined) {
+            return this.counselingService.findAll();
+        }
+        const pageRequest = normalizePage(page, limit);
+        const result = await this.counselingService.findAdminPage(pageRequest, { status, search });
+        return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
     }
     async createCounseling(body) {
         if (!body || !body.clientName || !body.concern || !body.preferredMethod) {
@@ -171,10 +180,11 @@ let AdminController = class AdminController {
         return { success: true, message: `Counseling request #${id} deleted successfully.` };
     }
     async getInnerHealing() {
-        const [requests, clients] = await Promise.all([
-            this.innerHealingService.findAll(),
-            this.clientsService.findAll(),
-        ]);
+        const requests = await this.innerHealingService.findAll();
+        const missingClientIds = requests
+            .filter((item) => !item.clientName || !item.phone)
+            .map((item) => item.telegramId);
+        const clients = await this.clientsService.findByTelegramIds(missingClientIds);
         const clientMap = new Map(clients.map((c) => [String(c.telegramId), c]));
         return requests.map((item) => {
             const client = clientMap.get(String(item.telegramId));
@@ -468,8 +478,13 @@ let AdminController = class AdminController {
             };
         });
     }
-    async getQuestions() {
-        return this.questionsService.getAll();
+    async getQuestions(page, limit, status, search) {
+        if (page === undefined && limit === undefined && status === undefined && search === undefined) {
+            return this.questionsService.getAll();
+        }
+        const pageRequest = normalizePage(page, limit);
+        const result = await this.questionsService.getAdminPage(pageRequest, { status, search });
+        return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
     }
     async answerQuestion(id, body) {
         if (!body || !body.answer || !body.answer.trim()) {
@@ -602,8 +617,20 @@ let AdminController = class AdminController {
         }
         return { success: true, message: `Resource order #${id} deleted successfully.` };
     }
-    async getDonations(status, search) {
+    async getDonations(status, search, paymentMethod, page, limit) {
+        if (page !== undefined || limit !== undefined || paymentMethod !== undefined) {
+            const pageRequest = normalizePage(page, limit);
+            const result = await this.donationsService.findAdminPage(pageRequest, {
+                status,
+                search,
+                paymentMethod,
+            });
+            return toPageResult(result.items, result.total, { ...pageRequest, page: result.page });
+        }
         return this.donationsService.findAll({ status, search });
+    }
+    getDonationSummary() {
+        return this.donationsService.getAdminSummary();
     }
     async verifyDonation(id, body) {
         const donation = await this.donationsService.updateStatus(id, 'verified', body?.adminNotes);
@@ -671,9 +698,19 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "deleteClient", null);
 __decorate([
-    Get('counseling'),
+    Get('counseling/count'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getCounselingCount", null);
+__decorate([
+    Get('counseling'),
+    __param(0, Query('page')),
+    __param(1, Query('limit')),
+    __param(2, Query('status')),
+    __param(3, Query('search')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getCounseling", null);
 __decorate([
@@ -1026,8 +1063,12 @@ __decorate([
 ], AdminController.prototype, "getResources", null);
 __decorate([
     Get('questions'),
+    __param(0, Query('page')),
+    __param(1, Query('limit')),
+    __param(2, Query('status')),
+    __param(3, Query('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getQuestions", null);
 __decorate([
@@ -1104,10 +1145,19 @@ __decorate([
     Get('donations'),
     __param(0, Query('status')),
     __param(1, Query('search')),
+    __param(2, Query('paymentMethod')),
+    __param(3, Query('page')),
+    __param(4, Query('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getDonations", null);
+__decorate([
+    Get('donations/summary'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getDonationSummary", null);
 __decorate([
     Post('donations/:id/verify'),
     __param(0, Param('id', ParseIntPipe)),

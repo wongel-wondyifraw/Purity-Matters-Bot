@@ -15,6 +15,15 @@ async function bootstrap() {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
     app.use((req, res, next) => {
+        const startedAt = Date.now();
+        if (req.path.startsWith('/api/')) {
+            res.once('finish', () => {
+                const durationMs = Date.now() - startedAt;
+                if (res.statusCode >= 400 || durationMs >= 1500) {
+                    logger.warn(`API ${req.method} ${req.path} status=${res.statusCode} durationMs=${durationMs}`);
+                }
+            });
+        }
         if (req.path.startsWith('/uploads/')) {
             res.setHeader('Cache-Control', 'public, max-age=86400');
         }

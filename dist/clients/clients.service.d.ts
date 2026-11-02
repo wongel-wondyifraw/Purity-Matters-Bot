@@ -20,6 +20,7 @@ export declare class ClientsService {
     updateMetadata(telegramId: number | string, metadata: Record<string, any>): Promise<Client | null>;
     cancelRegistration(telegramId: number | string): Promise<Client | null>;
     findAll(): Promise<Client[]>;
+    findByTelegramIds(telegramIds: Array<string | number>): Promise<Client[]>;
     findById(id: number): Promise<Client | null>;
     updateRole(id: number, role: string): Promise<Client | null>;
     findByPhone(phone: string): Promise<Client | null>;

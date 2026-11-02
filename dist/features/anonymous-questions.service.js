@@ -75,6 +75,28 @@ let AnonymousQuestionsService = AnonymousQuestionsService_1 = class AnonymousQue
             order: { createdAt: 'DESC' },
         });
     }
+    async getAdminPage(pageRequest, filters) {
+        const query = this.questionRepo.createQueryBuilder('question');
+        if (filters.status && filters.status !== 'all') {
+            query.andWhere('question.status = :status', { status: filters.status });
+        }
+        if (filters.search?.trim()) {
+            query.andWhere('(question.question ILIKE :search OR question.category ILIKE :search OR question.referenceNumber ILIKE :search)', { search: `%${filters.search.trim()}%` });
+        }
+        query
+            .orderBy('question.createdAt', 'DESC')
+            .addOrderBy('question.id', 'DESC')
+            .skip((pageRequest.page - 1) * pageRequest.limit)
+            .take(pageRequest.limit);
+        let [items, total] = await query.getManyAndCount();
+        const totalPages = Math.max(1, Math.ceil(total / pageRequest.limit));
+        const page = Math.min(pageRequest.page, totalPages);
+        if (page !== pageRequest.page) {
+            query.skip((page - 1) * pageRequest.limit).take(pageRequest.limit);
+            items = await query.getMany();
+        }
+        return { items, total, page };
+    }
     async findById(id) {
         return this.questionRepo.findOne({ where: { id } });
     }

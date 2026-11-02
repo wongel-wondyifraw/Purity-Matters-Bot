@@ -75,6 +75,29 @@ let CounselingService = CounselingService_1 = class CounselingService {
     async findAll() {
         return this.requestRepo.find({ order: { createdAt: 'DESC' } });
     }
+    async findAdminPage(pageRequest, filters) {
+        const query = this.requestRepo.createQueryBuilder('request');
+        if (filters.status && filters.status !== 'all') {
+            query.andWhere('request.status = :status', { status: filters.status });
+        }
+        if (filters.search?.trim()) {
+            const search = `%${filters.search.trim()}%`;
+            query.andWhere('(request.clientName ILIKE :search OR request.referenceNumber ILIKE :search OR request.concern ILIKE :search OR request.assignedTo ILIKE :search OR request.phone ILIKE :search)', { search });
+        }
+        query
+            .orderBy('request.createdAt', 'DESC')
+            .addOrderBy('request.id', 'DESC')
+            .skip((pageRequest.page - 1) * pageRequest.limit)
+            .take(pageRequest.limit);
+        let [items, total] = await query.getManyAndCount();
+        const totalPages = Math.max(1, Math.ceil(total / pageRequest.limit));
+        const page = Math.min(pageRequest.page, totalPages);
+        if (page !== pageRequest.page) {
+            query.skip((page - 1) * pageRequest.limit).take(pageRequest.limit);
+            items = await query.getMany();
+        }
+        return { items, total, page };
+    }
     async count() {
         return this.requestRepo.count();
     }
